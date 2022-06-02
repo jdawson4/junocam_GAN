@@ -1,3 +1,4 @@
 # Make sure not to include the images--there are gigabytes of info in there!
 raw_imgs/
 user_imgs/
+fake_images/
