@@ -42,7 +42,7 @@
 # Enough writing, on with the coding!
 
 # IMPORTS
-from email.contentmanager import raw_data_manager
+import os
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
@@ -53,23 +53,27 @@ physical_devices = tf.config.experimental.list_physical_devices('GPU')
 num_gpus = len(physical_devices)
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
+#tf.autograph.set_verbosity(
+#    level=0, alsologtostdout=False
+#)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # CONSTANTS
 seed = 3 # my lucky number!
 batch_size = 1 # unsure what my computer can handle haha
 num_channels = 3 # rgb baby
-image_size = 800
+image_size = 1600
 # each raw image is 1600x1600. I think each output should be too
-latent_dim_smaller_by_factor = 2
+#latent_dim_smaller_by_factor = 2
 # not 100% sure about this, but maybe the generator should be
 # smaller in the middle?
-psi = 0.01
+psi = 0.1
 # determines how much weight we give to "content loss" vs the
 # "fooling the discriminator" loss in our generative loss function.
 # 1 means that we only care about content loss; 0 means that we only
 # care about fooling the discriminator
 epochs = 100
-num_filters = 16
+num_filters = 4
 
 # The data on my computer is nearly 600 MB...
 # I'm not sure if this is a great idea:
@@ -77,7 +81,7 @@ raw_imgs = keras.preprocessing.image_dataset_from_directory(
     "raw_imgs/",
     labels = None,
     color_mode = 'rgb',
-    batch_size = 1,
+    batch_size = batch_size,
     image_size = (image_size, image_size),
     shuffle=True,
     seed = seed
@@ -86,7 +90,7 @@ user_imgs = keras.preprocessing.image_dataset_from_directory(
     "user_imgs/",
     labels = None,
     color_mode = 'rgb',
-    batch_size = 1,
+    batch_size = batch_size,
     image_size = (image_size, image_size), # force everything to be this size?
     shuffle=True,
     crop_to_aspect_ratio = True, # unsure about this one
@@ -126,11 +130,11 @@ generator = keras.Sequential(
         keras.layers.InputLayer((image_size,image_size,num_channels),dtype=tf.float16),
         keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding='same'),
         keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.MaxPooling2D(pool_size = latent_dim_smaller_by_factor), # reduce to a smaller latent space. Maybe we shouldn't, who knows!
-        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding='same'), # do some convolutions in the smaller latent space!
-        keras.layers.LeakyReLU(alpha=0.2), # nonlinearity
-        keras.layers.Conv2DTranspose(num_channels, (2,2), strides = latent_dim_smaller_by_factor), # upscale back up to the original size!
-        keras.layers.LeakyReLU(alpha = 0.2),
+        #keras.layers.MaxPooling2D(pool_size = latent_dim_smaller_by_factor), # reduce to a smaller latent space. Maybe we shouldn't, who knows!
+        #keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding='same'), # do some convolutions in the smaller latent space!
+        #keras.layers.LeakyReLU(alpha=0.2), # nonlinearity
+        #keras.layers.Conv2DTranspose(num_channels, (2,2), strides = latent_dim_smaller_by_factor), # upscale back up to the original size!
+        #keras.layers.LeakyReLU(alpha = 0.2),
         keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'), # do some final convoluting
         keras.layers.LeakyReLU(alpha=0.2), # a final nonlinearity
         # outputs... how do outputs work again?
@@ -152,13 +156,15 @@ discriminator.summary()
 print('\n')
 generator.summary()
 print('\n')
+print("Image size:", image_size)
 print("Approx. raw imgs dataset size:", batch_size * raw_imgs.cardinality().numpy())
 print("Approx. user imgs dataset size:", batch_size * user_imgs.cardinality().numpy())
 print("Batch size:", batch_size)
-print("Latent dim used by generator is 1/"+str(latent_dim_smaller_by_factor), "of input")
+#print("Latent dim used by generator is 1/"+str(latent_dim_smaller_by_factor), "of input")
 print("Value of hyperparameter psi:", psi)
 print("Intended number of epochs:",epochs)
 print("Number of GPUs we're running on:", num_gpus)
+print("Number of filters at each convolutional layer:", num_filters)
 print('\n')
 print('######################################################################')
 print('\n')
@@ -205,8 +211,11 @@ for datum in data.__iter__():
 #    print(fake.shape)
 #    print(type(real))
 #    print(real.shape)
-#    return tf.keras.losses.MeanAbsolutePercentageError([fake], [real])
-content_loss = tf.keras.losses.MeanAbsolutePercentageError()
+#    return tf.keras.losses.MeanAbsolutePercentageError([fake], [real]) # no this doesn't return in the correct format
+#content_loss = tf.keras.losses.MeanAbsolutePercentageError() # always returns infinity???
+def content_loss(fake, real):
+    return tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))
+    # apparently this returns semantic dist?
 
 
 # and here we create teh ConditionalGAN itself. Exciting!
@@ -241,7 +250,7 @@ class ConditionalGAN(keras.Model):
         #print(type(data))
         #print(len(data))
         #print(type(data[0]))
-        raw_img_batch, user_img_batch = data[0]
+        raw_img_batch, user_img_batch = data
         #print(type(raw_img_batch))
         #print(type(user_img_batch))
         #print(raw_img_batch.dtype)
@@ -289,20 +298,22 @@ class ConditionalGAN(keras.Model):
             predictions = self.discriminator(fake_images) # might not need??
             g_loss1 = self.loss_fn(fake_image_labels, predictions)
             classic_g_loss = g_loss1
-        g_loss2 = content_loss(fake_images, raw_img_batch)
-        #print(g_loss2.dtype)
-        g_loss2 = tf.cast(g_loss2, tf.float32)
-        g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
-        g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
-        #total_g_loss = ((1-psi) * g_loss1) + (psi * g_loss2) # tf is unhappy?
-        total_g_loss = tf.math.add(g_loss1, g_loss2) # hideous. Let me use a plus sign.
-        print("Total_g_loss", total_g_loss)
-        grads = tape.gradient(classic_g_loss, self.generator.trainable_weights)
+            g_loss2 = content_loss(fake_images, raw_img_batch)
+            #print(g_loss2.dtype)
+            #print(g_loss1)
+            #print(g_loss2)
+            g_loss2 = tf.cast(g_loss2, tf.float32)
+            g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
+            g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
+            #total_g_loss = ((1-psi) * g_loss1) + (psi * g_loss2) # tf is unhappy?
+            total_g_loss = tf.math.add(g_loss1, g_loss2) # hideous. Let me use a plus sign.
+            #print("Total_g_loss", total_g_loss)
+        grads = tape.gradient(total_g_loss, self.generator.trainable_weights)
         self.g_optimizer.apply_gradients(
             zip(grads,self.generator.trainable_weights)
         )
 
-        self.gen_loss_tracker.update_state(classic_g_loss)
+        self.gen_loss_tracker.update_state(total_g_loss)
         self.dis_loss_tracker.update_state(d_loss)
 
         return {
@@ -321,18 +332,45 @@ cond_gan.compile(
     run_eagerly=True
 )
 
-a = raw_imgs.__iter__()
-b = user_imgs.__iter__()
-def stupid_data_thing():
-    return (tf.cast(a.get_next(), tf.float16), tf.cast(b.get_next(), tf.float16))
+'''a = raw_imgs.__iter__()
+b = user_imgs.__iter__()'''
+#def stupid_data_thing():
+#    return (tf.cast(a.get_next(), tf.float16), tf.cast(b.get_next(), tf.float16))
 
 #print(type(raw_imgs))
 #print(type(user_imgs))
-cond_gan.fit(
-    x=stupid_data_thing(),
-    epochs=epochs,
-    batch_size = batch_size
-)
+#cond_gan.fit(
+#    tensorflow is being finicky. It won't let me insert both datasets into fit right here. Unfortunate.
+#    x=stupid_data_thing(),
+#    epochs=epochs,
+#    batch_size = batch_size
+#)
+
+#print('here!')
+for i in range(1,epochs+1):
+    print("Epoch", str(i))
+    gl = 0.0
+    dl = 0.0
+    a = raw_imgs.__iter__()
+    b = user_imgs.__iter__()
+    num_batches = tf.get_static_value(raw_imgs.cardinality())
+    for j in range(num_batches):
+        x_batch = tf.cast(a.get_next(), tf.float16)
+        y_batch = tf.cast(b.get_next(), tf.float16)
+        metrics = cond_gan.train_on_batch(
+            x=x_batch,
+            y=y_batch,
+            return_dict=True
+        )
+        gl += metrics['g_loss']
+        dl += metrics['d_loss']
+        #print(dl)
+        #print(gl)
+        #print(f'batch {j}:', metrics)
+    gl /= num_batches
+    dl /= num_batches
+    print(f"g-loss: {gl}, d-loss: {dl}")
+    cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True)
 
 i = 0
 trained_generator = cond_gan.generator
