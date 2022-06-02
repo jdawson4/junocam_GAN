@@ -347,6 +347,7 @@ b = user_imgs.__iter__()'''
 #)
 
 #print('here!')
+#cond_gan.load_weights("ckpts/ckpt"+str(16))
 for i in range(1,epochs+1):
     print("Epoch", str(i))
     gl = 0.0
@@ -370,7 +371,7 @@ for i in range(1,epochs+1):
     gl /= num_batches
     dl /= num_batches
     print(f"g-loss: {gl}, d-loss: {dl}")
-    cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True)
+    cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
 
 i = 0
 trained_generator = cond_gan.generator
