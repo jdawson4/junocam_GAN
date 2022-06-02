@@ -348,6 +348,9 @@ b = user_imgs.__iter__()'''
 
 #print('here!')
 #cond_gan.load_weights("ckpts/ckpt"+str(16))
+#cond_gan.built=True
+#cond_gan.load_weights("ckpts/ckpt24")
+#print("Checkpoint loaded, skipping training.")
 for i in range(1,epochs+1):
     print("Epoch", str(i))
     gl = 0.0
@@ -377,6 +380,7 @@ i = 0
 trained_generator = cond_gan.generator
 for b in raw_imgs.__iter__():
     i+=1
+    print("Generating image", i)
     fake_images = trained_generator(b)
     fake_images *= 255.0
     fake_images = fake_images.numpy().astype(np.uint8)
