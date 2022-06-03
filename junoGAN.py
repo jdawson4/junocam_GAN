@@ -73,7 +73,7 @@ psi = 0.8
 # 1 means that we only care about content loss; 0 means that we only
 # care about fooling the discriminator
 chi = 0.85 # how much we care about SSIM vs L2 when creating content loss
-epochs = 25
+epochs = 50
 num_filters = 8
 
 # The data on my computer is nearly 600 MB...
@@ -368,11 +368,12 @@ cond_gan.compile(
 
 # only uncomment this code if you have a prepared checkpoint to use for output:
 #cond_gan.built=True
-#cond_gan.load_weights("ckpts/ckpt10")
+#cond_gan.load_weights("ckpts/ckpt30")
 #print("Checkpoint loaded, skipping training.")
+#cond_gan.generator.save('junoGen',overwrite=True)
 
-'''a = raw_imgs.__iter__()
-b = user_imgs.__iter__()'''
+#a = raw_imgs.__iter__()
+#b = user_imgs.__iter__()
 #def stupid_data_thing():
 #    return (tf.cast(a.get_next(), tf.float16), tf.cast(b.get_next(), tf.float16))
 
@@ -418,7 +419,11 @@ for i in range(1,epochs+1):
     dl /= num_batches
     print(f"g-loss: {gl:.4f}, d-loss: {dl:.4f}")
     if ((i%5)==0):
+        # save a checkpoint every 5 epochs for a history of training
         cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
+        if (i%20)==0:
+            cond_gan.generator.save('junoGen',overwrite=True)
+            # every 20 epochs, save g
 
 i = 0
 trained_generator = cond_gan.generator
