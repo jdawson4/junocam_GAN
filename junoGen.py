@@ -14,7 +14,7 @@ raw_imgs = tf.keras.preprocessing.image_dataset_from_directory(
     seed = 7
 )
 
-trained_gen = tf.keras.models.load_model('junoGAN')
+trained_gen = tf.keras.models.load_model('junoGen')
 i = 0
 for b in raw_imgs.__iter__():
     i+=1

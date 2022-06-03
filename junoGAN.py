@@ -46,7 +46,7 @@ import os
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
-import imageio
+#import imageio
 #import tensorflow_datasets as tfds
 
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -368,7 +368,7 @@ cond_gan.compile(
 
 # only uncomment this code if you have a prepared checkpoint to use for output:
 #cond_gan.built=True
-#cond_gan.load_weights("ckpts/ckpt30")
+#cond_gan.load_weights("ckpts/ckpt40")
 #print("Checkpoint loaded, skipping training.")
 #cond_gan.generator.save('junoGen',overwrite=True)
 
@@ -417,14 +417,17 @@ for i in range(1,epochs+1):
     dl = tf.cast(dl, tf.float32)
     gl /= num_batches
     dl /= num_batches
-    print(f"g-loss: {gl:.4f}, d-loss: {dl:.4f}")
+    print(f"g-loss: {gl:.10f}, d-loss: {dl:.10f}")
     if ((i%5)==0):
         # save a checkpoint every 5 epochs for a history of training
         cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
         if (i%20)==0:
             cond_gan.generator.save('junoGen',overwrite=True)
             # every 20 epochs, save g
+cond_gan.generator.save('junoGen',overwrite=True)
+# for good measure, save again once we're done training
 
+'''
 i = 0
 trained_generator = cond_gan.generator
 for b in raw_imgs.__iter__():
@@ -437,3 +440,4 @@ for b in raw_imgs.__iter__():
     fake_images = fake_images.numpy().astype(np.uint8)
     for fake_image in fake_images:
         imageio.imwrite('fake_images/'+str(i)+'.png', fake_image)
+'''
