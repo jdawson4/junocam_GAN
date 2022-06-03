@@ -62,18 +62,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 seed = 3 # my lucky number!
 batch_size = 1 # unsure what my computer can handle haha
 num_channels = 3 # rgb baby
-image_size = 1600
+image_size = 1024
 # each raw image is 1600x1600. I think each output should be too
 #latent_dim_smaller_by_factor = 2
 # not 100% sure about this, but maybe the generator should be
 # smaller in the middle?
-psi = 0.1
+psi = 0.5
 # determines how much weight we give to "content loss" vs the
 # "fooling the discriminator" loss in our generative loss function.
 # 1 means that we only care about content loss; 0 means that we only
 # care about fooling the discriminator
 epochs = 100
-num_filters = 4
+num_filters = 12
 
 # The data on my computer is nearly 600 MB...
 # I'm not sure if this is a great idea:
@@ -111,6 +111,18 @@ discriminator = keras.Sequential(
         keras.layers.LeakyReLU(alpha=0.2),
         keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
         keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
+        keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
+        keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
+        keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
+        keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
+        keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
+        keras.layers.LeakyReLU(alpha=0.2),
         keras.layers.GlobalMaxPooling2D(),
         keras.layers.Dense(1),
     ],
@@ -135,6 +147,18 @@ generator = keras.Sequential(
         #keras.layers.LeakyReLU(alpha=0.2), # nonlinearity
         #keras.layers.Conv2DTranspose(num_channels, (2,2), strides = latent_dim_smaller_by_factor), # upscale back up to the original size!
         #keras.layers.LeakyReLU(alpha = 0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
+        keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
+        keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
+        keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
+        keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
+        keras.layers.LeakyReLU(alpha=0.2),
+        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
+        keras.layers.LeakyReLU(alpha=0.2),
         keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'), # do some final convoluting
         keras.layers.LeakyReLU(alpha=0.2), # a final nonlinearity
         # outputs... how do outputs work again?
@@ -306,7 +330,7 @@ class ConditionalGAN(keras.Model):
             g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
             g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
             #total_g_loss = ((1-psi) * g_loss1) + (psi * g_loss2) # tf is unhappy?
-            total_g_loss = tf.math.add(g_loss1, g_loss2) # hideous. Let me use a plus sign.
+            total_g_loss = tf.math.add(tf.math.abs(g_loss1), tf.math.abs(g_loss2)) # hideous. Let me use a plus sign.
             #print("Total_g_loss", total_g_loss)
         grads = tape.gradient(total_g_loss, self.generator.trainable_weights)
         self.g_optimizer.apply_gradients(
@@ -346,10 +370,9 @@ b = user_imgs.__iter__()'''
 #    batch_size = batch_size
 #)
 
-#print('here!')
-#cond_gan.load_weights("ckpts/ckpt"+str(16))
+# only uncomment this code if you have a prepared checkpoint to use for output:
 #cond_gan.built=True
-#cond_gan.load_weights("ckpts/ckpt24")
+#cond_gan.load_weights("ckpts/ckpt20")
 #print("Checkpoint loaded, skipping training.")
 for i in range(1,epochs+1):
     print("Epoch", str(i))
@@ -374,13 +397,14 @@ for i in range(1,epochs+1):
     gl /= num_batches
     dl /= num_batches
     print(f"g-loss: {gl}, d-loss: {dl}")
-    cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
+    if ((i%5)==0):
+        cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
 
 i = 0
 trained_generator = cond_gan.generator
 for b in raw_imgs.__iter__():
     i+=1
-    print("Generating image", i)
+    #print("Generating image", i)
     fake_images = trained_generator(b)
     fake_images *= 255.0
     fake_images = fake_images.numpy().astype(np.uint8)
