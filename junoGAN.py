@@ -67,12 +67,13 @@ image_size = 1024
 #latent_dim_smaller_by_factor = 2
 # not 100% sure about this, but maybe the generator should be
 # smaller in the middle?
-psi = 0.5
+psi = 0.8
 # determines how much weight we give to "content loss" vs the
 # "fooling the discriminator" loss in our generative loss function.
 # 1 means that we only care about content loss; 0 means that we only
 # care about fooling the discriminator
-epochs = 5
+chi = 0.85 # how much we care about SSIM vs L2 when creating content loss
+epochs = 25
 num_filters = 8
 
 # The data on my computer is nearly 600 MB...
@@ -186,6 +187,7 @@ print("Approx. user imgs dataset size:", batch_size * user_imgs.cardinality().nu
 print("Batch size:", batch_size)
 #print("Latent dim used by generator is 1/"+str(latent_dim_smaller_by_factor), "of input")
 print("Value of hyperparameter psi:", psi)
+print("Value of hyperparameter chi:", chi)
 print("Intended number of epochs:",epochs)
 print("Number of GPUs we're running on:", num_gpus)
 print("Number of filters at each convolutional layer:", num_filters)
@@ -238,7 +240,9 @@ for datum in data.__iter__():
 #    return tf.keras.losses.MeanAbsolutePercentageError([fake], [real]) # no this doesn't return in the correct format
 #content_loss = tf.keras.losses.MeanAbsolutePercentageError() # always returns infinity???
 def content_loss(fake, real):
-    return 1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0)))
+    ssim = chi *(1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
+    mse = (1-chi) * (tf.keras.metrics.mean_squared_error(fake, real))
+    return tf.cast(ssim,tf.float32)+tf.cast(mse,tf.float32)
     # apparently this returns semantic dist?
     # note: SSIM measures from 0 to 1. 0 means poor quality, 1 means good
     # quality. We want loss to be 1-ssim, so that we encourage good quality,#
@@ -246,6 +250,7 @@ def content_loss(fake, real):
     # This SHOULD fix an issue where it seems like the generator was coming
     # up with images that where spherical (and able to trick the discriminator)
     # but still fucked up (colors looked WEIRD.)
+    # Others still are using SSIM + L2, which... I sorta like! I'll consider it.
 
 # and here we create teh ConditionalGAN itself. Exciting!
 class ConditionalGAN(keras.Model):
@@ -361,13 +366,19 @@ cond_gan.compile(
     run_eagerly=True
 )
 
+# only uncomment this code if you have a prepared checkpoint to use for output:
+#cond_gan.built=True
+#cond_gan.load_weights("ckpts/ckpt10")
+#print("Checkpoint loaded, skipping training.")
+
 '''a = raw_imgs.__iter__()
 b = user_imgs.__iter__()'''
 #def stupid_data_thing():
 #    return (tf.cast(a.get_next(), tf.float16), tf.cast(b.get_next(), tf.float16))
 
-#print(type(raw_imgs))
-#print(type(user_imgs))
+# this code doesn't work. I just realized that zip() would probably work to
+# combine the two datasets in a useful way, but I came up with another
+# (better?) solution first.
 #cond_gan.fit(
 #    tensorflow is being finicky. It won't let me insert both datasets into fit right here. Unfortunate.
 #    x=stupid_data_thing(),
@@ -375,10 +386,11 @@ b = user_imgs.__iter__()'''
 #    batch_size = batch_size
 #)
 
-# only uncomment this code if you have a prepared checkpoint to use for output:
-#cond_gan.built=True
-#cond_gan.load_weights("ckpts/ckpt20")
-#print("Checkpoint loaded, skipping training.")
+# this is my janky, beautiful, disgusting, manual solution to the fit() problem
+# instead of using keras' in-built fit() function, I'm doing each batch
+# manually. However, this does mean that I can be quite specific with how my
+# checkpoints and callbacks work and shit like that, so that's nice.
+# Unfortunately, it prints out much uglier :(
 for i in range(1,epochs+1):
     print("Epoch", str(i))
     gl = 0.0
@@ -398,11 +410,13 @@ for i in range(1,epochs+1):
         dl += metrics['d_loss']
         #print(dl)
         #print(gl)
-        if (j%32==0):
-            print(f'batch {j}:', metrics)
+        #if (j%32==0):
+        #    print(f'Metrics for batch {j}:', metrics)
+    gl = tf.cast(gl, tf.float32) # sometimes this breaks? Unsure why.
+    dl = tf.cast(dl, tf.float32)
     gl /= num_batches
     dl /= num_batches
-    print(f"g-loss: {gl}, d-loss: {dl}")
+    print(f"g-loss: {gl:.4f}, d-loss: {dl:.4f}")
     if ((i%5)==0):
         cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
 
@@ -413,7 +427,7 @@ for b in raw_imgs.__iter__():
     #print("Generating image", i)
     fake_images = trained_generator(b)
     fake_images = tf.cast(fake_images, tf.float16)
-    fake_images = fake_images + b # more jerry-rigging
+    fake_images = fake_images + tf.cast(b,tf.float16) # more jerry-rigging
     fake_images *= 255.0
     fake_images = fake_images.numpy().astype(np.uint8)
     for fake_image in fake_images:
