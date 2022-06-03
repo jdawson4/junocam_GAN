@@ -72,8 +72,8 @@ psi = 0.5
 # "fooling the discriminator" loss in our generative loss function.
 # 1 means that we only care about content loss; 0 means that we only
 # care about fooling the discriminator
-epochs = 100
-num_filters = 12
+epochs = 5
+num_filters = 8
 
 # The data on my computer is nearly 600 MB...
 # I'm not sure if this is a great idea:
@@ -238,9 +238,14 @@ for datum in data.__iter__():
 #    return tf.keras.losses.MeanAbsolutePercentageError([fake], [real]) # no this doesn't return in the correct format
 #content_loss = tf.keras.losses.MeanAbsolutePercentageError() # always returns infinity???
 def content_loss(fake, real):
-    return tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))
+    return 1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0)))
     # apparently this returns semantic dist?
-
+    # note: SSIM measures from 0 to 1. 0 means poor quality, 1 means good
+    # quality. We want loss to be 1-ssim, so that we encourage good quality,#
+    # right? Yes. That's what others are doing, so I'll copy them.
+    # This SHOULD fix an issue where it seems like the generator was coming
+    # up with images that where spherical (and able to trick the discriminator)
+    # but still fucked up (colors looked WEIRD.)
 
 # and here we create teh ConditionalGAN itself. Exciting!
 class ConditionalGAN(keras.Model):
@@ -291,8 +296,7 @@ class ConditionalGAN(keras.Model):
         #print(type(generated_images))
         #print(generated_images.dtype)
         generated_images = tf.cast(generated_images, tf.float16)
-        #print(type(generated_images))
-        #print(generated_images.dtype)
+        generated_images = generated_images + raw_img_batch # this jerry-rigs the generator to work like a resnet
 
         # do we need to do this?
         #fake_images_and_labels = tf.concat([generated_images, fake_image_labels],-1)
@@ -318,6 +322,7 @@ class ConditionalGAN(keras.Model):
         with tf.GradientTape() as tape:
             fake_images = self.generator(raw_img_batch)
             fake_images = tf.cast(fake_images, tf.float16)
+            fake_images = fake_images + raw_img_batch # more jerry-rigging
             #fake_image_and_labels = tf.concat([fake_images,fake_image_labels],-1)
             predictions = self.discriminator(fake_images) # might not need??
             g_loss1 = self.loss_fn(fake_image_labels, predictions)
@@ -393,7 +398,8 @@ for i in range(1,epochs+1):
         dl += metrics['d_loss']
         #print(dl)
         #print(gl)
-        #print(f'batch {j}:', metrics)
+        if (j%32==0):
+            print(f'batch {j}:', metrics)
     gl /= num_batches
     dl /= num_batches
     print(f"g-loss: {gl}, d-loss: {dl}")
@@ -406,6 +412,8 @@ for b in raw_imgs.__iter__():
     i+=1
     #print("Generating image", i)
     fake_images = trained_generator(b)
+    fake_images = tf.cast(fake_images, tf.float16)
+    fake_images = fake_images + b # more jerry-rigging
     fake_images *= 255.0
     fake_images = fake_images.numpy().astype(np.uint8)
     for fake_image in fake_images:
