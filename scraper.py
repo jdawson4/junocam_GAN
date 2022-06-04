@@ -1,3 +1,5 @@
+# Author: Jacob Dawson
+#
 # The idea for this script is to just scrape images available to the public on the Junocam website.
 # Each image is available at a link like the following:
 # https://www.missionjuno.swri.edu/junocam/processing?id=13190

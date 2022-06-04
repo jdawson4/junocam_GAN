@@ -46,6 +46,8 @@ import os
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
+from constants import *
+from architecture import *
 #import imageio
 #import tensorflow_datasets as tfds
 
@@ -58,6 +60,8 @@ if len(physical_devices) > 0:
 #)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+# constants moved to constants.py
+'''
 # CONSTANTS
 seed = 3 # my lucky number!
 batch_size = 1 # unsure what my computer can handle haha
@@ -67,14 +71,14 @@ image_size = 1024
 #latent_dim_smaller_by_factor = 2
 # not 100% sure about this, but maybe the generator should be
 # smaller in the middle?
-psi = 0.3
+psi = 0.1
 # determines how much weight we give to "content loss" vs the
 # "fooling the discriminator" loss in our generative loss function.
 # 1 means that we only care about content loss; 0 means that we only
 # care about fooling the discriminator
 chi = 0.85 # how much we care about SSIM vs L2 when creating content loss
 epochs = 50
-num_filters = 8
+num_filters = 8'''
 
 # The data on my computer is nearly 600 MB...
 # I'm not sure if this is a great idea:
@@ -104,6 +108,8 @@ user_imgs = keras.preprocessing.image_dataset_from_directory(
 #print("Raw imgs dataset size:", batch_size * raw_imgs.cardinality().numpy())
 #print("User imgs dataset size:", batch_size * user_imgs.cardinality().numpy())
 
+# I have moved all the architecture descriptions to architecture.py
+'''
 # ARCHITECTURE
 discriminator = keras.Sequential(
     [
@@ -170,7 +176,12 @@ generator = keras.Sequential(
 # note that the generator might want to be significantly smaller
 # (half the size?) of the discriminator. I think that this is a good idea
 # because its outputs should theoretically need less "work" to arrive at
-# (after all, it's just learning proper color correction)
+# (after all, it's just learning proper color correction)'''
+
+# these are declared in architecture.py
+generator = gen()
+discriminator = dis()
+
 
 # let's print some useful info here
 print('\n')
@@ -265,11 +276,12 @@ class ConditionalGAN(keras.Model):
     def metrics(self):
         return [self.gen_loss_tracker, self.dis_loss_tracker]
     
-    def compile(self, d_optimizer, g_optimizer, loss_fn, run_eagerly):
+    def compile(self, d_optimizer, g_optimizer, d_loss_fn, g_loss_fn, run_eagerly):
         super(ConditionalGAN, self).compile(run_eagerly=run_eagerly)
         self.d_optimizer = d_optimizer
         self.g_optimizer = g_optimizer
-        self.loss_fn = loss_fn
+        self.d_loss_fn = d_loss_fn
+        self.g_loss_fn = g_loss_fn
         #self.epoch_num = 0
 
     def train_step(self, data):
@@ -352,13 +364,16 @@ class ConditionalGAN(keras.Model):
         with tf.GradientTape() as gtape, tf.GradientTape() as dtape:
             fake_images = self.generator(raw_img_batch)
             fake_images = tf.cast(fake_images,tf.float16)
+            #print(fake_images.shape)
+            #print(raw_img_batch.shape)
             fake_images = fake_images + raw_img_batch # act like a resnet
-            all_images = tf.concat([user_img_batch, fake_images],0)
-            all_labels = tf.concat([true_image_labels,fake_image_labels],0)
-            all_predictions = self.discriminator(all_images)
-            g_predictions = all_predictions[:batch_size]
-            d_loss = self.loss_fn(all_labels, all_predictions)
-            g_loss1 = self.loss_fn(fake_image_labels, g_predictions)
+            #all_images = tf.concat([user_img_batch, fake_images],0)
+            #all_labels = tf.concat([true_image_labels,fake_image_labels],0)
+            #all_predictions = self.discriminator(all_images)
+            g_predictions = self.discriminator(fake_images)
+            d_predictions = self.discriminator(raw_img_batch)
+            d_loss = tf.math.abs(self.d_loss_fn(d_predictions) - self.d_loss_fn(g_predictions))
+            g_loss1 = self.g_loss_fn(g_predictions)
             g_loss2 = content_loss(fake_images, raw_img_batch)
             g_loss2 = tf.cast(g_loss2, tf.float32)
             g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
@@ -386,9 +401,10 @@ cond_gan = ConditionalGAN(
     discriminator=discriminator, generator=generator
 )
 cond_gan.compile(
-    d_optimizer = keras.optimizers.Adam(learning_rate = 0.0003),
-    g_optimizer = keras.optimizers.Adam(learning_rate = 0.0003),
-    loss_fn = keras.losses.BinaryCrossentropy(from_logits=True),
+    d_optimizer = tf.keras.optimizers.RMSprop(learning_rate = dis_learn_rate),
+    g_optimizer = tf.keras.optimizers.RMSprop(learning_rate = gen_learn_rate),
+    d_loss_fn = tf.reduce_mean,
+    g_loss_fn = tf.reduce_mean,
     run_eagerly=True
 )
 
@@ -437,19 +453,22 @@ for i in range(1,epochs+1):
         dl += metrics['d_loss']
         #print(dl)
         #print(gl)
-        #if (j%32==0):
-        #    print(f'Metrics for batch {j}:', metrics)
+        if (j%64==0):
+            b_g_loss = metrics['g_loss']
+            b_d_loss = metrics['d_loss']
+            #print(f'Metrics for batch {j}:', metrics)
+            print(f'Batch {j} g{b_g_loss:.4f} d{b_d_loss:.4f},', end=' ')
     gl = tf.cast(gl, tf.float32) # sometimes this breaks? Unsure why.
     dl = tf.cast(dl, tf.float32)
     gl /= num_batches
     dl /= num_batches
-    print(f"g-loss: {gl:.10f}, d-loss: {dl:.10f}")
+    print(f"\ng-loss: {gl:.10f}, d-loss: {dl:.10f}")
     if ((i%5)==0):
         # save a checkpoint every 5 epochs for a history of training
         cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
-        if (i%20)==0:
+        if (i%10)==0:
             cond_gan.generator.save('junoGen',overwrite=True)
-            # every 20 epochs, save g
+            # every few checkpoints, save model.
 cond_gan.generator.save('junoGen',overwrite=True)
 # for good measure, save again once we're done training
 
