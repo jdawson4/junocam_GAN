@@ -304,8 +304,8 @@ class ConditionalGAN(keras.Model):
 
         # generate labels for the real and fake images
         batch_size = tf.shape(raw_img_batch)[0]
-        true_image_labels = tf.zeros((batch_size,1))
-        fake_image_labels = tf.ones((batch_size,1))
+        true_image_labels = tf.cast(-tf.ones((batch_size,1)), tf.float32)
+        fake_image_labels = tf.cast(tf.ones((batch_size,1)), tf.float32)
         # REMEMBER: TRUE IMAGES ARE 0, GENERATED IMAGES ARE 1
         
         # make generations:
@@ -371,11 +371,12 @@ class ConditionalGAN(keras.Model):
             #all_labels = tf.concat([true_image_labels,fake_image_labels],0)
             #all_predictions = self.discriminator(all_images)
             g_predictions = self.discriminator(fake_images)
-            d_predictions = self.discriminator(raw_img_batch)
-            d_loss = tf.math.abs(self.d_loss_fn(d_predictions) - self.d_loss_fn(g_predictions))
-            g_loss1 = self.g_loss_fn(g_predictions)
+            d_predictions = self.discriminator(user_img_batch)
+            d_loss = -tf.math.abs(self.d_loss_fn(true_image_labels,d_predictions) - self.d_loss_fn(fake_image_labels,g_predictions))
+            g_loss1 = self.g_loss_fn(fake_image_labels,g_predictions)
             g_loss2 = content_loss(fake_images, raw_img_batch)
             g_loss2 = tf.cast(g_loss2, tf.float32)
+            g_loss1 = tf.cast(g_loss1, tf.float32)
             g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
             g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
             total_g_loss = tf.math.add(tf.math.abs(g_loss1), tf.math.abs(g_loss2))
@@ -400,11 +401,13 @@ class ConditionalGAN(keras.Model):
 cond_gan = ConditionalGAN(
     discriminator=discriminator, generator=generator
 )
+def wasserstein_loss(y_true,y_pred):
+    return tf.keras.backend.mean(y_true*y_pred)
 cond_gan.compile(
     d_optimizer = tf.keras.optimizers.RMSprop(learning_rate = dis_learn_rate),
     g_optimizer = tf.keras.optimizers.RMSprop(learning_rate = gen_learn_rate),
-    d_loss_fn = tf.reduce_mean,
-    g_loss_fn = tf.reduce_mean,
+    d_loss_fn = wasserstein_loss,
+    g_loss_fn = wasserstein_loss,
     run_eagerly=True
 )
 
@@ -435,7 +438,7 @@ cond_gan.compile(
 # checkpoints and callbacks work and shit like that, so that's nice.
 # Unfortunately, it prints out much uglier :(
 for i in range(1,epochs+1):
-    print("Epoch", str(i))
+    print("Epoch", str(i), end=' ')
     gl = 0.0
     dl = 0.0
     a = raw_imgs.__iter__()
@@ -453,16 +456,16 @@ for i in range(1,epochs+1):
         dl += metrics['d_loss']
         #print(dl)
         #print(gl)
-        if (j%64==0):
-            b_g_loss = metrics['g_loss']
-            b_d_loss = metrics['d_loss']
-            #print(f'Metrics for batch {j}:', metrics)
-            print(f'Batch {j} g{b_g_loss:.4f} d{b_d_loss:.4f},', end=' ')
+        #if (j%64==0):
+        #    b_g_loss = metrics['g_loss']
+        #    b_d_loss = metrics['d_loss']
+        #    #print(f'Metrics for batch {j}:', metrics)
+        #    print(f'Batch {j} g{b_g_loss:.4f} d{b_d_loss:.4f},', end=' ')
     gl = tf.cast(gl, tf.float32) # sometimes this breaks? Unsure why.
     dl = tf.cast(dl, tf.float32)
     gl /= num_batches
     dl /= num_batches
-    print(f"\ng-loss: {gl:.10f}, d-loss: {dl:.10f}")
+    print(f"g-loss: {gl:.10f}, d-loss: {dl:.10f}")
     if ((i%5)==0):
         # save a checkpoint every 5 epochs for a history of training
         cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')

@@ -9,7 +9,7 @@ batch_size = 1 # unsure what my computer can handle haha
 num_channels = 3 # rgb baby
 image_size = 1024
 # each raw image is 1600x1600. I think each output should be too
-epochs = 50
+epochs = 100
 num_filters = 32
 
 # custom hyperparameters
@@ -23,5 +23,5 @@ chi = 0.85 # how much we care about SSIM vs L2 when creating content loss
 # learning rates:
 # some people suggest these should be the same--I find that the discriminator
 # optimizes faster, so I'll give the generator a stronger learning rate.
-gen_learn_rate = 0.03
+gen_learn_rate = 3
 dis_learn_rate = 0.0003

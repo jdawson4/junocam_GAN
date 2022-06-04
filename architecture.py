@@ -13,10 +13,10 @@ from constants import *
 def gen_encoder_block(n,batchnorm=True):
     t = keras.Sequential()
     # downsample:
-    t.add(keras.layers.Conv2D(n, (4,4), strides=(2,2), padding='same'))
+    t.add(keras.layers.Conv2D(n, (3,3), strides=(2,2), padding='same'))
     if batchnorm:
         # optionally batchnormalize
-        t.add(keras.layers.BatchNormalization())
+        t.add(keras.layers.BatchNormalization(momentum=0.85))
     t.add(keras.layers.LeakyReLU(alpha=0.2))
     return t
 
@@ -24,9 +24,9 @@ def gen_encoder_block(n,batchnorm=True):
 def gen_decoder_block(n,dropout=True):
     t=keras.Sequential()
     # upsample:
-    t.add(keras.layers.Conv2DTranspose(n, (4,4), strides=(2,2), padding='same'))
+    t.add(keras.layers.Conv2DTranspose(n, (3,3), strides=(2,2), padding='same'))
     # always do batch normalization
-    t.add(keras.layers.BatchNormalization())
+    t.add(keras.layers.BatchNormalization(momentum=0.85))
     if dropout:
         # optional dropout layer
         t.add(keras.layers.Dropout(0.5))
@@ -44,18 +44,25 @@ def gen():
             # input:
             keras.layers.InputLayer((image_size,image_size,num_channels),dtype=tf.float16),
             # encode to latent space:
-            gen_encoder_block(num_filters//4, batchnorm=False),
-            gen_encoder_block(num_filters//2),
-            gen_encoder_block(num_filters),
+            gen_encoder_block(num_filters//5, batchnorm=False),
+            gen_encoder_block(num_filters//3),
+            #gen_encoder_block(num_filters),
             # bottleneck:
-            keras.layers.Conv2D(num_filters,(4,4), strides=(1,1), padding='same'),
+            keras.layers.Conv2D(num_filters,(3,3), strides=(1,1), padding='same'),
+            keras.layers.BatchNormalization(momentum=0.85),
+            keras.layers.LeakyReLU(alpha=0.2),
+            keras.layers.Conv2D(num_filters,(3,3), strides=(1,1), padding='same'),
+            keras.layers.BatchNormalization(momentum=0.85),
+            keras.layers.LeakyReLU(alpha=0.2),
+            keras.layers.Conv2D(num_filters,(3,3), strides=(1,1), padding='same'),
+            keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
             # decode:
-            gen_decoder_block(num_filters),
-            gen_decoder_block(num_filters//2),
-            gen_decoder_block(num_filters//4, dropout=False),
+            #gen_decoder_block(num_filters),
+            gen_decoder_block(num_filters//3),
+            gen_decoder_block(num_filters//5, dropout=False),
             # output, make sure its outputting an RGB:
-            keras.layers.Conv2D(3, (4,4), strides=(1,1), padding='same', activation='tanh')
+            keras.layers.Conv2D(3, (3,3), strides=(1,1), padding='same', activation='tanh')
         ],
         name='generator'
     )
@@ -67,17 +74,20 @@ def dis():
     d = keras.Sequential(
         [
             keras.layers.InputLayer((image_size,image_size,num_channels),dtype=tf.float16),
-            keras.layers.Conv2D(num_filters, (4,4), strides=(2,2), padding='same'),
-            keras.layers.BatchNormalization(),
+            keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
+            keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
-            keras.layers.Conv2D(num_filters, (4,4), strides=(2,2), padding='same'),
-            keras.layers.BatchNormalization(),
+            keras.layers.Conv2D(num_filters//2, (3,3), strides=(2,2), padding='same'),
+            keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
-            keras.layers.Conv2D(num_filters, (4,4), strides=(2,2), padding='same'),
-            keras.layers.BatchNormalization(),
+            keras.layers.Conv2D(num_filters//3, (3,3), strides=(4,4), padding='same'),
+            keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
-            keras.layers.Conv2D(num_filters, (4,4), strides=(2,2), padding='same',activation='sigmoid'),
-            keras.layers.GlobalMaxPooling2D(),
+            keras.layers.Conv2D(num_filters//4, (3,3), strides=(4,4), padding='same'),
+            keras.layers.BatchNormalization(momentum=0.85),
+            keras.layers.LeakyReLU(alpha=0.2),
+            keras.layers.Conv2D(num_filters//5, (3,3), strides=(4,4), padding='same',activation='sigmoid'),
+            keras.layers.Flatten(),
             keras.layers.Dense(1)
         ],
         name='discriminator'
