@@ -4,3 +4,5 @@ raw_imgs/
 user_imgs/
 fake_images/
 ckpts/
+# we do not need pycache:
+__pycache__/
