@@ -67,7 +67,7 @@ image_size = 1024
 #latent_dim_smaller_by_factor = 2
 # not 100% sure about this, but maybe the generator should be
 # smaller in the middle?
-psi = 0.8
+psi = 0.3
 # determines how much weight we give to "content loss" vs the
 # "fooling the discriminator" loss in our generative loss function.
 # 1 means that we only care about content loss; 0 means that we only
@@ -297,22 +297,22 @@ class ConditionalGAN(keras.Model):
         # REMEMBER: TRUE IMAGES ARE 0, GENERATED IMAGES ARE 1
         
         # make generations:
-        generated_images = self.generator(raw_img_batch)
+        #generated_images = self.generator(raw_img_batch)
         #print(type(generated_images))
         #print(generated_images.dtype)
-        generated_images = tf.cast(generated_images, tf.float16)
-        generated_images = generated_images + raw_img_batch # this jerry-rigs the generator to work like a resnet
+        #generated_images = tf.cast(generated_images, tf.float16)
+        #generated_images = generated_images + raw_img_batch # this jerry-rigs the generator to work like a resnet
 
         # do we need to do this?
         #fake_images_and_labels = tf.concat([generated_images, fake_image_labels],-1)
         #real_images_and_labels = tf.concat([user_img_batch, true_image_labels],-1)
         
         # whatever. Make a thing for the discriminator to work with.
-        all_images = tf.concat([user_img_batch, generated_images],0)
-        all_labels = tf.concat([true_image_labels,fake_image_labels],0)
+        #all_images = tf.concat([user_img_batch, generated_images],0)
+        #all_labels = tf.concat([true_image_labels,fake_image_labels],0)
         #all_images_and_labels = tf.concat([all_images,all_labels],-1)
 
-        # make discriminations
+        '''# make discriminations
         with tf.GradientTape() as tape:
             predictions = self.discriminator(all_images)
             d_loss = self.loss_fn(all_labels, predictions)
@@ -343,6 +343,32 @@ class ConditionalGAN(keras.Model):
             total_g_loss = tf.math.add(tf.math.abs(g_loss1), tf.math.abs(g_loss2)) # hideous. Let me use a plus sign.
             #print("Total_g_loss", total_g_loss)
         grads = tape.gradient(total_g_loss, self.generator.trainable_weights)
+        self.g_optimizer.apply_gradients(
+            zip(grads,self.generator.trainable_weights)
+        )'''
+
+        # update: replace the above clusterfuck with a more optimized version.
+        # This is possible because GradientTapes are actually really cool.
+        with tf.GradientTape() as gtape, tf.GradientTape() as dtape:
+            fake_images = self.generator(raw_img_batch)
+            fake_images = tf.cast(fake_images,tf.float16)
+            fake_images = fake_images + raw_img_batch # act like a resnet
+            all_images = tf.concat([user_img_batch, fake_images],0)
+            all_labels = tf.concat([true_image_labels,fake_image_labels],0)
+            all_predictions = self.discriminator(all_images)
+            g_predictions = all_predictions[:batch_size]
+            d_loss = self.loss_fn(all_labels, all_predictions)
+            g_loss1 = self.loss_fn(fake_image_labels, g_predictions)
+            g_loss2 = content_loss(fake_images, raw_img_batch)
+            g_loss2 = tf.cast(g_loss2, tf.float32)
+            g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
+            g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
+            total_g_loss = tf.math.add(tf.math.abs(g_loss1), tf.math.abs(g_loss2))
+        grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
+        self.d_optimizer.apply_gradients(
+            zip(grads, self.discriminator.trainable_weights)
+        )
+        grads = gtape.gradient(total_g_loss, self.generator.trainable_weights)
         self.g_optimizer.apply_gradients(
             zip(grads,self.generator.trainable_weights)
         )
