@@ -55,30 +55,7 @@ physical_devices = tf.config.experimental.list_physical_devices('GPU')
 num_gpus = len(physical_devices)
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
-#tf.autograph.set_verbosity(
-#    level=0, alsologtostdout=False
-#)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-# constants moved to constants.py
-'''
-# CONSTANTS
-seed = 3 # my lucky number!
-batch_size = 1 # unsure what my computer can handle haha
-num_channels = 3 # rgb baby
-image_size = 1024
-# each raw image is 1600x1600. I think each output should be too
-#latent_dim_smaller_by_factor = 2
-# not 100% sure about this, but maybe the generator should be
-# smaller in the middle?
-psi = 0.1
-# determines how much weight we give to "content loss" vs the
-# "fooling the discriminator" loss in our generative loss function.
-# 1 means that we only care about content loss; 0 means that we only
-# care about fooling the discriminator
-chi = 0.85 # how much we care about SSIM vs L2 when creating content loss
-epochs = 50
-num_filters = 8'''
 
 # The data on my computer is nearly 600 MB...
 # I'm not sure if this is a great idea:
@@ -104,79 +81,6 @@ user_imgs = keras.preprocessing.image_dataset_from_directory(
 
 # maybe we should do image augmentation? Come back to this!
 # TODO: CONSIDER IMAGE AUGMENTATION
-
-#print("Raw imgs dataset size:", batch_size * raw_imgs.cardinality().numpy())
-#print("User imgs dataset size:", batch_size * user_imgs.cardinality().numpy())
-
-# I have moved all the architecture descriptions to architecture.py
-'''
-# ARCHITECTURE
-discriminator = keras.Sequential(
-    [
-        keras.layers.InputLayer((image_size, image_size, num_channels),dtype=tf.float16),
-        keras.layers.Conv2D(num_filters, (3,3), strides = (2,2), padding = 'same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides=(2,2), padding='same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.GlobalMaxPooling2D(),
-        keras.layers.Dense(1),
-    ],
-    name='discriminator',
-)
-# the architecture here summarizes thoughts into smaller and smaller
-# latent spaces and then spits out a boolean.
-
-# the generator is a little more complicated. I'm not sure, but I think that
-# having some sort of bottleneck akin to encoding/decoding would be helpful.
-#
-# We control the size of this bottleneck via a constant declared above,
-# latent_dim_smaller_by_factor, an extremely catchy name that I'm sure will
-# catch on everywhere.
-generator = keras.Sequential(
-    [
-        keras.layers.InputLayer((image_size,image_size,num_channels),dtype=tf.float16),
-        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding='same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        #keras.layers.MaxPooling2D(pool_size = latent_dim_smaller_by_factor), # reduce to a smaller latent space. Maybe we shouldn't, who knows!
-        #keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding='same'), # do some convolutions in the smaller latent space!
-        #keras.layers.LeakyReLU(alpha=0.2), # nonlinearity
-        #keras.layers.Conv2DTranspose(num_channels, (2,2), strides = latent_dim_smaller_by_factor), # upscale back up to the original size!
-        #keras.layers.LeakyReLU(alpha = 0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'),
-        keras.layers.LeakyReLU(alpha=0.2),
-        keras.layers.Conv2D(num_filters, (3,3), strides = (1,1), padding = 'same'), # do some final convoluting
-        keras.layers.LeakyReLU(alpha=0.2), # a final nonlinearity
-        # outputs... how do outputs work again?
-        keras.layers.Conv2D(num_channels, (2, 2), padding="same", activation="sigmoid"),
-    ],
-    name='generator'
-)
-# note that the generator might want to be significantly smaller
-# (half the size?) of the discriminator. I think that this is a good idea
-# because its outputs should theoretically need less "work" to arrive at
-# (after all, it's just learning proper color correction)'''
 
 # these are declared in architecture.py
 generator = gen()
@@ -206,50 +110,6 @@ print('\n')
 print('######################################################################')
 print('\n')
 
-# actually, I've thought about it, and we should really do this:
-'''raw_imgs = raw_imgs.as_numpy_iterator()
-user_imgs = user_imgs.as_numpy_iterator()
-print(type(raw_imgs))
-for x in raw_imgs:
-    print(type(x))
-    print(x.shape)
-    break
-# both datasets are now iterable tensorflow objects
-# in which each iteration returns an ndarray of shape (4,1600,1600,3).
-# That is, 4 images of size 1600x1600 in RGB. Great!'''
-# just kidding! This is wrong and bad!
-'''raw_imgs = raw_imgs.__iter__()
-user_imgs = user_imgs.__iter__()
-temp_raw_imgs = list()
-temp_user_imgs = list()
-for x in raw_imgs:
-    temp_raw_imgs.append(x)
-    temp_user_imgs.append(user_imgs.get_next())
-raw_imgs = np.array(temp_raw_imgs, dtype = np.float32)
-user_imgs = np.array(temp_user_imgs, dtype = np.float32)
-print(raw_imgs.shape)
-print(user_imgs.shape)'''
-# this is also broken! Crap!
-'''data = tf.data.Dataset.from_tensors((raw_imgs.__iter__(), user_imgs.__iter__()))
-print(type(data))
-for datum in data.__iter__():
-    print(type(datum))
-    print(len(datum))
-    firstitem,seconditem = datum
-    print(type(firstitem))
-    print(type(seconditem))'''
-# also bad!
-
-# unfortunately we need to do this really quick.
-# Not 100% sure how to go about this, might not even use it at all!
-# Funny how these things work.
-#def content_loss(fake, real):
-#    print(type(fake))
-#    print(fake.shape)
-#    print(type(real))
-#    print(real.shape)
-#    return tf.keras.losses.MeanAbsolutePercentageError([fake], [real]) # no this doesn't return in the correct format
-#content_loss = tf.keras.losses.MeanAbsolutePercentageError() # always returns infinity???
 def content_loss(fake, real):
     ssim = chi *(1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
     mse = (1-chi) * (tf.keras.metrics.mean_squared_error(fake, real))
@@ -293,83 +153,20 @@ class ConditionalGAN(keras.Model):
         # I've just repackaged the data to be just that.
         # Remember: when we call fit, x should be set to the raw
         # images, and y should be set to the user-made ones.
-        #print(type(data))
-        #print(len(data))
-        #print(type(data[0]))
         raw_img_batch, user_img_batch = data
-        #print(type(raw_img_batch))
-        #print(type(user_img_batch))
-        #print(raw_img_batch.dtype)
-        #print(user_img_batch.dtype)
 
         # generate labels for the real and fake images
         batch_size = tf.shape(raw_img_batch)[0]
         true_image_labels = tf.cast(tf.zeros((batch_size,1)), tf.float32)
         fake_image_labels = tf.cast(tf.ones((batch_size,1)), tf.float32)
         # REMEMBER: TRUE IMAGES ARE 0, GENERATED IMAGES ARE 1
-        
-        # make generations:
-        #generated_images = self.generator(raw_img_batch)
-        #print(type(generated_images))
-        #print(generated_images.dtype)
-        #generated_images = tf.cast(generated_images, tf.float16)
-        #generated_images = generated_images + raw_img_batch # this jerry-rigs the generator to work like a resnet
-
-        # do we need to do this?
-        #fake_images_and_labels = tf.concat([generated_images, fake_image_labels],-1)
-        #real_images_and_labels = tf.concat([user_img_batch, true_image_labels],-1)
-        
-        # whatever. Make a thing for the discriminator to work with.
-        #all_images = tf.concat([user_img_batch, generated_images],0)
-        #all_labels = tf.concat([true_image_labels,fake_image_labels],0)
-        #all_images_and_labels = tf.concat([all_images,all_labels],-1)
-
-        '''# make discriminations
-        with tf.GradientTape() as tape:
-            predictions = self.discriminator(all_images)
-            d_loss = self.loss_fn(all_labels, predictions)
-        grads = tape.gradient(d_loss, self.discriminator.trainable_weights)
-        self.d_optimizer.apply_gradients(
-            zip(grads, self.discriminator.trainable_weights)
-        )
-
-        # unfortunately, because of how gradienttape works, I now need to do
-        # the generation process all over again. This isn't ideal, because the
-        # discriminator was JUST trained on the generator's outputs. Hmm.
-        with tf.GradientTape() as tape:
-            fake_images = self.generator(raw_img_batch)
-            fake_images = tf.cast(fake_images, tf.float16)
-            fake_images = fake_images + raw_img_batch # more jerry-rigging
-            #fake_image_and_labels = tf.concat([fake_images,fake_image_labels],-1)
-            predictions = self.discriminator(fake_images) # might not need??
-            g_loss1 = self.loss_fn(fake_image_labels, predictions)
-            classic_g_loss = g_loss1
-            g_loss2 = content_loss(fake_images, raw_img_batch)
-            #print(g_loss2.dtype)
-            #print(g_loss1)
-            #print(g_loss2)
-            g_loss2 = tf.cast(g_loss2, tf.float32)
-            g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
-            g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
-            #total_g_loss = ((1-psi) * g_loss1) + (psi * g_loss2) # tf is unhappy?
-            total_g_loss = tf.math.add(tf.math.abs(g_loss1), tf.math.abs(g_loss2)) # hideous. Let me use a plus sign.
-            #print("Total_g_loss", total_g_loss)
-        grads = tape.gradient(total_g_loss, self.generator.trainable_weights)
-        self.g_optimizer.apply_gradients(
-            zip(grads,self.generator.trainable_weights)
-        )'''
 
         # update: replace the above clusterfuck with a more optimized version.
         # This is possible because GradientTapes are actually really cool.
         with tf.GradientTape() as gtape, tf.GradientTape() as dtape:
             fake_images = self.generator(raw_img_batch)
             fake_images = tf.cast(fake_images,tf.float16)
-            #print(fake_images.shape)
-            #print(raw_img_batch.shape)
             fake_images = fake_images + raw_img_batch # act like a resnet
-            #all_images = tf.concat([user_img_batch, fake_images],0)
-            #all_labels = tf.concat([true_image_labels,fake_image_labels],0)
-            #all_predictions = self.discriminator(all_images)
             g_predictions = self.discriminator(fake_images)
             d_predictions = self.discriminator(user_img_batch)
             d_loss = tf.math.abs(self.d_loss_fn(true_image_labels,d_predictions)) + tf.math.abs(self.d_loss_fn(fake_image_labels,g_predictions))
@@ -401,8 +198,8 @@ class ConditionalGAN(keras.Model):
 cond_gan = ConditionalGAN(
     discriminator=discriminator, generator=generator
 )
-def wasserstein_loss(y_true,y_pred):
-    return tf.keras.backend.mean(y_true*y_pred)
+#def wasserstein_loss(y_true,y_pred):
+#    return tf.keras.backend.mean(y_true*y_pred)
 cond_gan.compile(
     d_optimizer = tf.keras.optimizers.Adam(learning_rate = dis_learn_rate),
     g_optimizer = tf.keras.optimizers.Adam(learning_rate = gen_learn_rate),
@@ -415,22 +212,6 @@ cond_gan.compile(
 #cond_gan.built=True
 #cond_gan.load_weights("ckpts/ckpt40")
 #print("Checkpoint loaded, skipping training.")
-#cond_gan.generator.save('junoGen',overwrite=True)
-
-#a = raw_imgs.__iter__()
-#b = user_imgs.__iter__()
-#def stupid_data_thing():
-#    return (tf.cast(a.get_next(), tf.float16), tf.cast(b.get_next(), tf.float16))
-
-# this code doesn't work. I just realized that zip() would probably work to
-# combine the two datasets in a useful way, but I came up with another
-# (better?) solution first.
-#cond_gan.fit(
-#    tensorflow is being finicky. It won't let me insert both datasets into fit right here. Unfortunate.
-#    x=stupid_data_thing(),
-#    epochs=epochs,
-#    batch_size = batch_size
-#)
 
 # this is my janky, beautiful, disgusting, manual solution to the fit() problem
 # instead of using keras' in-built fit() function, I'm doing each batch
@@ -466,7 +247,7 @@ for i in range(1,epochs+1):
     gl /= num_batches
     dl /= num_batches
     print(f"g-loss: {gl:.10f}, d-loss: {dl:.10f}")
-    if ((i%5)==0):
+    if ((i%10)==0):
         # save a checkpoint every 5 epochs for a history of training
         cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
         if (i%10)==0:
