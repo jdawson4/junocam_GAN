@@ -176,7 +176,7 @@ class ConditionalGAN(keras.Model):
             g_loss1 = tf.cast(g_loss1, tf.float32)
             g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
             g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
-            total_g_loss = tf.math.add(-tf.math.abs(g_loss1), -tf.math.abs(g_loss2))
+            total_g_loss = tf.math.add(tf.math.abs(g_loss1), tf.math.abs(g_loss2))
         grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
         self.d_optimizer.apply_gradients(
             zip(grads, self.discriminator.trainable_weights)

@@ -46,13 +46,13 @@ def gen():
             # encode to latent space:
             gen_encoder_block(num_filters, batchnorm=False),
             gen_encoder_block(num_filters),
-            gen_encoder_block(num_filters),
+            #gen_encoder_block(num_filters),
             # bottleneck:
             keras.layers.Conv2D(num_filters,(3,3), strides=(1,1), padding='same'),
             keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
             # decode:
-            gen_decoder_block(num_filters),
+            #gen_decoder_block(num_filters),
             gen_decoder_block(num_filters),
             gen_decoder_block(num_filters, dropout=False),
             # output, make sure its outputting an RGB:
@@ -71,10 +71,10 @@ def dis():
             keras.layers.Conv2D(num_filters, (3,3), strides=(4,4), padding='same'),
             keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
-            keras.layers.Conv2D(num_filters//2, (3,3), strides=(4,4), padding='same'),
+            keras.layers.Conv2D(num_filters, (3,3), strides=(4,4), padding='same'),
             keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
-            keras.layers.Conv2D(num_filters//3, (3,3), strides=(4,4), padding='same'),
+            keras.layers.Conv2D(num_filters, (3,3), strides=(4,4), padding='same'),
             keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
             keras.layers.Conv2D(num_filters, (3,3), strides=(4,4), padding='same',activation='sigmoid'),

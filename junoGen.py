@@ -4,15 +4,16 @@
 import tensorflow as tf
 import numpy as np
 import imageio
+from constants import *
 
 raw_imgs = tf.keras.preprocessing.image_dataset_from_directory(
     "raw_imgs/",
     labels = None,
     color_mode = 'rgb',
-    batch_size = 1,
-    image_size = (1024, 1024),
+    batch_size = batch_size,
+    image_size = (image_size, image_size),
     shuffle=True,
-    seed = 7
+    seed = seed
 )
 
 trained_gen = tf.keras.models.load_model('junoGen')
