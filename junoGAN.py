@@ -304,7 +304,7 @@ class ConditionalGAN(keras.Model):
 
         # generate labels for the real and fake images
         batch_size = tf.shape(raw_img_batch)[0]
-        true_image_labels = tf.cast(-tf.ones((batch_size,1)), tf.float32)
+        true_image_labels = tf.cast(tf.zeros((batch_size,1)), tf.float32)
         fake_image_labels = tf.cast(tf.ones((batch_size,1)), tf.float32)
         # REMEMBER: TRUE IMAGES ARE 0, GENERATED IMAGES ARE 1
         
@@ -372,7 +372,7 @@ class ConditionalGAN(keras.Model):
             #all_predictions = self.discriminator(all_images)
             g_predictions = self.discriminator(fake_images)
             d_predictions = self.discriminator(user_img_batch)
-            d_loss = -tf.math.abs(self.d_loss_fn(true_image_labels,d_predictions) - self.d_loss_fn(fake_image_labels,g_predictions))
+            d_loss = tf.math.abs(self.d_loss_fn(true_image_labels,d_predictions)) + tf.math.abs(self.d_loss_fn(fake_image_labels,g_predictions))
             g_loss1 = self.g_loss_fn(fake_image_labels,g_predictions)
             g_loss2 = content_loss(fake_images, raw_img_batch)
             g_loss2 = tf.cast(g_loss2, tf.float32)
@@ -404,10 +404,10 @@ cond_gan = ConditionalGAN(
 def wasserstein_loss(y_true,y_pred):
     return tf.keras.backend.mean(y_true*y_pred)
 cond_gan.compile(
-    d_optimizer = tf.keras.optimizers.RMSprop(learning_rate = dis_learn_rate),
-    g_optimizer = tf.keras.optimizers.RMSprop(learning_rate = gen_learn_rate),
-    d_loss_fn = wasserstein_loss,
-    g_loss_fn = wasserstein_loss,
+    d_optimizer = tf.keras.optimizers.Adam(learning_rate = dis_learn_rate),
+    g_optimizer = tf.keras.optimizers.Adam(learning_rate = gen_learn_rate),
+    d_loss_fn = keras.losses.BinaryCrossentropy(from_logits=True),
+    g_loss_fn = keras.losses.BinaryCrossentropy(from_logits=True),
     run_eagerly=True
 )
 
@@ -472,6 +472,7 @@ for i in range(1,epochs+1):
         if (i%10)==0:
             cond_gan.generator.save('junoGen',overwrite=True)
             # every few checkpoints, save model.
+cond_gan.save_weights("ckpts/finished", overwrite=True, save_format='h5')
 cond_gan.generator.save('junoGen',overwrite=True)
 # for good measure, save again once we're done training
 

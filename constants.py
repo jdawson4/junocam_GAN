@@ -23,5 +23,5 @@ chi = 0.85 # how much we care about SSIM vs L2 when creating content loss
 # learning rates:
 # some people suggest these should be the same--I find that the discriminator
 # optimizes faster, so I'll give the generator a stronger learning rate.
-gen_learn_rate = 3
+gen_learn_rate = 0.0003
 dis_learn_rate = 0.0003
