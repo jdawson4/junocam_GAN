@@ -10,7 +10,7 @@ num_channels = 3 # rgb baby
 image_size = 256
 # each raw image is 1600x1600. I think each output should be too
 epochs = 300
-num_filters = 8
+num_filters = 16
 
 # custom hyperparameters
 psi = 0.05
@@ -19,9 +19,11 @@ psi = 0.05
 # 1 means that we only care about content loss; 0 means that we only
 # care about fooling the discriminator
 chi = 0.85 # how much we care about SSIM vs L2 when creating content loss
+# ^ not sure if we're even going to use L2 after all.
 
 # learning rates:
 # some people suggest these should be the same--I find that the discriminator
 # optimizes faster, so I'll give the generator a stronger learning rate.
-gen_learn_rate = 0.003
-dis_learn_rate = 0.0003
+gen_learn_rate = 0.0001
+dis_learn_rate = 0.0001
+momentum = 0.5

@@ -116,12 +116,11 @@ print('\n')
 def content_loss(fake, real):
     #print(fake)
     #print(real)
-    #ssim = chi *(1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
-    #mse_loss = (1-chi) * tf.math.reduce_sum(tf.math.squared_difference(fake, real))
-    #print(tf.math.squared_difference(fake, real))
+    ssim = chi *(1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
+    l2 = (1-chi) * tf.math.reduce_mean(tf.math.squared_difference(fake, real))
     #print('ssim,',ssim)
-    #print('mse,',mse_loss)
-    #return tf.cast(ssim,tf.float32)+tf.cast(mse_loss,tf.float32)
+    #print('l2,',l2)
+    return tf.cast(ssim,tf.float32)+tf.cast(l2,tf.float32)
     # apparently this returns semantic dist?
     # note: SSIM measures from 0 to 1. 0 means poor quality, 1 means good
     # quality. We want loss to be 1-ssim, so that we encourage good quality,#
@@ -130,7 +129,7 @@ def content_loss(fake, real):
     # up with images that where spherical (and able to trick the discriminator)
     # but still fucked up (colors looked WEIRD.)
     # Others still are using SSIM + L2, which... I sorta like! I'll consider it.
-    return (1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
+    #return (1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
 # and here we create teh ConditionalGAN itself. Exciting!
 class ConditionalGAN(keras.Model):
     def __init__(self,discriminator, generator):
@@ -221,8 +220,8 @@ cond_gan = ConditionalGAN(
 #def wasserstein_loss(y_true,y_pred):
 #    return tf.keras.backend.mean(y_true*y_pred)
 cond_gan.compile(
-    d_optimizer = tf.keras.optimizers.Adam(learning_rate = dis_learn_rate),
-    g_optimizer = tf.keras.optimizers.Adam(learning_rate = gen_learn_rate),
+    d_optimizer = tf.keras.optimizers.Adam(learning_rate = dis_learn_rate, beta_1=momentum),
+    g_optimizer = tf.keras.optimizers.Adam(learning_rate = gen_learn_rate, beta_1=momentum),
     d_loss_fn = keras.losses.BinaryCrossentropy(from_logits=False),
     g_loss_fn = keras.losses.BinaryCrossentropy(from_logits=False),
     run_eagerly=True
