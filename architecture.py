@@ -48,7 +48,10 @@ def gen():
             gen_encoder_block(num_filters),
             #gen_encoder_block(num_filters),
             # bottleneck:
-            keras.layers.Conv2D(num_filters,(3,3), strides=(1,1), padding='same'),
+            keras.layers.Conv2D(num_filters*2,(3,3), strides=(1,1), padding='same'),
+            keras.layers.BatchNormalization(momentum=0.85),
+            keras.layers.LeakyReLU(alpha=0.2),
+            keras.layers.Conv2D(num_filters*2,(3,3), strides=(1,1), padding='same'),
             keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
             # decode:
@@ -56,7 +59,7 @@ def gen():
             gen_decoder_block(num_filters),
             gen_decoder_block(num_filters, dropout=False),
             # output, make sure its outputting an RGB:
-            keras.layers.Conv2D(3, (3,3), strides=(1,1), padding='same', activation='tanh')
+            keras.layers.Conv2D(3, (3,3), strides=(1,1), padding='same', activation='sigmoid'),
         ],
         name='generator'
     )

@@ -6,3 +6,5 @@ fake_images/
 ckpts/
 # we do not need pycache:
 __pycache__/
+# we definitely don't need checkpoint images:
+checkpoint_imgs/
