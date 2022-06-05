@@ -48,7 +48,7 @@ from tensorflow import keras
 import numpy as np
 from constants import *
 from architecture import *
-#import imageio
+import imageio
 #import tensorflow_datasets as tfds
 
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -102,7 +102,9 @@ print("Approx. user imgs dataset size:", batch_size * user_imgs.cardinality().nu
 print("Batch size:", batch_size)
 #print("Latent dim used by generator is 1/"+str(latent_dim_smaller_by_factor), "of input")
 print("Value of hyperparameter psi:", psi)
-print("Value of hyperparameter chi:", chi)
+#print("Value of hyperparameter chi:", chi)
+print('g learning rate', gen_learn_rate)
+print('d learning rate', dis_learn_rate)
 print("Intended number of epochs:",epochs)
 print("Number of GPUs we're running on:", num_gpus)
 print("Number of filters at each convolutional layer:", num_filters)
@@ -110,10 +112,16 @@ print('\n')
 print('######################################################################')
 print('\n')
 
+#mse = tf.keras.losses.MeanSquaredError()
 def content_loss(fake, real):
-    ssim = chi *(1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
-    mse = (1-chi) * (tf.keras.metrics.mean_squared_error(fake, real))
-    return tf.cast(ssim,tf.float32)+tf.cast(mse,tf.float32)
+    #print(fake)
+    #print(real)
+    #ssim = chi *(1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
+    #mse_loss = (1-chi) * tf.math.reduce_sum(tf.math.squared_difference(fake, real))
+    #print(tf.math.squared_difference(fake, real))
+    #print('ssim,',ssim)
+    #print('mse,',mse_loss)
+    #return tf.cast(ssim,tf.float32)+tf.cast(mse_loss,tf.float32)
     # apparently this returns semantic dist?
     # note: SSIM measures from 0 to 1. 0 means poor quality, 1 means good
     # quality. We want loss to be 1-ssim, so that we encourage good quality,#
@@ -122,7 +130,7 @@ def content_loss(fake, real):
     # up with images that where spherical (and able to trick the discriminator)
     # but still fucked up (colors looked WEIRD.)
     # Others still are using SSIM + L2, which... I sorta like! I'll consider it.
-
+    return (1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
 # and here we create teh ConditionalGAN itself. Exciting!
 class ConditionalGAN(keras.Model):
     def __init__(self,discriminator, generator):
@@ -154,6 +162,10 @@ class ConditionalGAN(keras.Model):
         # Remember: when we call fit, x should be set to the raw
         # images, and y should be set to the user-made ones.
         raw_img_batch, user_img_batch = data
+        raw_img_batch /= 255.0
+        user_img_batch /= 255.0
+        #print('raws',tf.math.reduce_max(raw_img_batch))
+        #print('users',tf.math.reduce_max(user_img_batch))
 
         # generate labels for the real and fake images
         batch_size = tf.shape(raw_img_batch)[0]
@@ -166,17 +178,25 @@ class ConditionalGAN(keras.Model):
         with tf.GradientTape() as gtape, tf.GradientTape() as dtape:
             fake_images = self.generator(raw_img_batch)
             fake_images = tf.cast(fake_images,tf.float16)
-            fake_images = fake_images + raw_img_batch # act like a resnet
+            #print('fakes',tf.math.reduce_max(fake_images))
+            #fake_images = fake_images + raw_img_batch # act like a resnet
+            #print(fake_images[0])
+            #print(raw_img_batch[0])
             g_predictions = self.discriminator(fake_images)
             d_predictions = self.discriminator(user_img_batch)
             d_loss = tf.math.abs(self.d_loss_fn(true_image_labels,d_predictions)) + tf.math.abs(self.d_loss_fn(fake_image_labels,g_predictions))
             g_loss1 = self.g_loss_fn(fake_image_labels,g_predictions)
+            #print('compared:')
+            #print(true_image_labels)
+            #print(d_predictions)
             g_loss2 = content_loss(fake_images, raw_img_batch)
             g_loss2 = tf.cast(g_loss2, tf.float32)
             g_loss1 = tf.cast(g_loss1, tf.float32)
             g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
             g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
-            total_g_loss = tf.math.add(-tf.math.abs(g_loss1), -tf.math.abs(g_loss2))
+            #print(g_loss1)
+            #print(g_loss2)
+            total_g_loss = tf.math.add(tf.math.abs(g_loss1), tf.math.abs(g_loss2))
         grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
         self.d_optimizer.apply_gradients(
             zip(grads, self.discriminator.trainable_weights)
@@ -203,14 +223,14 @@ cond_gan = ConditionalGAN(
 cond_gan.compile(
     d_optimizer = tf.keras.optimizers.Adam(learning_rate = dis_learn_rate),
     g_optimizer = tf.keras.optimizers.Adam(learning_rate = gen_learn_rate),
-    d_loss_fn = keras.losses.BinaryCrossentropy(from_logits=True),
-    g_loss_fn = keras.losses.BinaryCrossentropy(from_logits=True),
+    d_loss_fn = keras.losses.BinaryCrossentropy(from_logits=False),
+    g_loss_fn = keras.losses.BinaryCrossentropy(from_logits=False),
     run_eagerly=True
 )
 
 # only uncomment this code if you have a prepared checkpoint to use for output:
 #cond_gan.built=True
-#cond_gan.load_weights("ckpts/ckpt40")
+#cond_gan.load_weights("ckpts/ckpt10")
 #print("Checkpoint loaded, skipping training.")
 
 # this is my janky, beautiful, disgusting, manual solution to the fit() problem
@@ -253,6 +273,14 @@ for i in range(1,epochs+1):
         if (i%10)==0:
             cond_gan.generator.save('junoGen',overwrite=True)
             # every few checkpoints, save model.
+        # every few epochs, save a an image
+        fake_image = cond_gan.generator(tf.expand_dims(x_batch[0],0)/255.0)[0]
+        fake_image = tf.cast(fake_image, tf.float16)
+        fake_image *= 255.0
+        #fake_images = fake_image + tf.cast(x_batch[0],tf.float16)+tf.cast(tf.ones(fake_images.shape), tf.float16)
+        fake_image = fake_image.numpy().astype(np.uint8)
+        imageio.imwrite('checkpoint_imgs/'+str(i)+'.png', fake_image)
+        imageio.imwrite('checkpoint_imgs/raw'+str(i)+'.png', x_batch[0].numpy().astype(np.uint8))
 cond_gan.save_weights("ckpts/finished", overwrite=True, save_format='h5')
 cond_gan.generator.save('junoGen',overwrite=True)
 # for good measure, save again once we're done training

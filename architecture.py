@@ -13,7 +13,7 @@ from constants import *
 def gen_encoder_block(n,batchnorm=True):
     t = keras.Sequential()
     # downsample:
-    t.add(keras.layers.Conv2D(n, (5,5), strides=(2,2), padding='same'))
+    t.add(keras.layers.Conv2D(n, (3,3), strides=(2,2), padding='same'))
     if batchnorm:
         # optionally batchnormalize
         t.add(keras.layers.BatchNormalization(momentum=0.85))
@@ -24,7 +24,7 @@ def gen_encoder_block(n,batchnorm=True):
 def gen_decoder_block(n,dropout=True):
     t=keras.Sequential()
     # upsample:
-    t.add(keras.layers.Conv2DTranspose(n, (5,5), strides=(2,2), padding='same'))
+    t.add(keras.layers.Conv2DTranspose(n, (3,3), strides=(2,2), padding='same'))
     # always do batch normalization
     t.add(keras.layers.BatchNormalization(momentum=0.85))
     if dropout:
@@ -48,13 +48,10 @@ def gen():
             gen_encoder_block(num_filters),
             #gen_encoder_block(num_filters),
             # bottleneck:
-            keras.layers.Conv2D(num_filters,(5,5), strides=(1,1), padding='same'),
+            keras.layers.Conv2D(num_filters*2,(3,3), strides=(1,1), padding='same'),
             keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
-            keras.layers.Conv2D(num_filters,(5,5), strides=(1,1), padding='same'),
-            keras.layers.BatchNormalization(momentum=0.85),
-            keras.layers.LeakyReLU(alpha=0.2),
-            keras.layers.Conv2D(num_filters,(5,5), strides=(1,1), padding='same'),
+            keras.layers.Conv2D(num_filters*2,(3,3), strides=(1,1), padding='same'),
             keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
             # decode:
@@ -62,7 +59,7 @@ def gen():
             gen_decoder_block(num_filters),
             gen_decoder_block(num_filters, dropout=False),
             # output, make sure its outputting an RGB:
-            keras.layers.Conv2D(3, (3,3), strides=(1,1), padding='same', activation='tanh')
+            keras.layers.Conv2D(3, (3,3), strides=(1,1), padding='same', activation='sigmoid'),
         ],
         name='generator'
     )
@@ -77,10 +74,10 @@ def dis():
             keras.layers.Conv2D(num_filters, (3,3), strides=(4,4), padding='same'),
             keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
-            keras.layers.Conv2D(num_filters//2, (3,3), strides=(4,4), padding='same'),
+            keras.layers.Conv2D(num_filters, (3,3), strides=(4,4), padding='same'),
             keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
-            keras.layers.Conv2D(num_filters//3, (3,3), strides=(4,4), padding='same'),
+            keras.layers.Conv2D(num_filters, (3,3), strides=(4,4), padding='same'),
             keras.layers.BatchNormalization(momentum=0.85),
             keras.layers.LeakyReLU(alpha=0.2),
             keras.layers.Conv2D(num_filters, (3,3), strides=(4,4), padding='same',activation='sigmoid'),
