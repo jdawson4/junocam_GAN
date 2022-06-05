@@ -256,18 +256,3 @@ for i in range(1,epochs+1):
 cond_gan.save_weights("ckpts/finished", overwrite=True, save_format='h5')
 cond_gan.generator.save('junoGen',overwrite=True)
 # for good measure, save again once we're done training
-
-'''
-i = 0
-trained_generator = cond_gan.generator
-for b in raw_imgs.__iter__():
-    i+=1
-    #print("Generating image", i)
-    fake_images = trained_generator(b)
-    fake_images = tf.cast(fake_images, tf.float16)
-    fake_images = fake_images + tf.cast(b,tf.float16) # more jerry-rigging
-    fake_images *= 255.0
-    fake_images = fake_images.numpy().astype(np.uint8)
-    for fake_image in fake_images:
-        imageio.imwrite('fake_images/'+str(i)+'.png', fake_image)
-'''
