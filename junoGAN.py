@@ -161,10 +161,12 @@ class ConditionalGAN(keras.Model):
         # Remember: when we call fit, x should be set to the raw
         # images, and y should be set to the user-made ones.
         raw_img_batch, user_img_batch = data
-        raw_img_batch /= 255.0
-        user_img_batch /= 255.0
+        raw_img_batch = (raw_img_batch - 127.5) / 127.5
+        user_img_batch = (user_img_batch - 127.5) / 127.5
         #print('raws',tf.math.reduce_max(raw_img_batch))
+        #print('raws',tf.math.reduce_min(raw_img_batch))
         #print('users',tf.math.reduce_max(user_img_batch))
+        #print('users',tf.math.reduce_min(user_img_batch))
 
         # generate labels for the real and fake images
         batch_size = tf.shape(raw_img_batch)[0]
@@ -178,6 +180,7 @@ class ConditionalGAN(keras.Model):
             fake_images = self.generator(raw_img_batch)
             fake_images = tf.cast(fake_images,tf.float16)
             #print('fakes',tf.math.reduce_max(fake_images))
+            #print('fakes',tf.math.reduce_min(fake_images))
             #fake_images = fake_images + raw_img_batch # act like a resnet
             #print(fake_images[0])
             #print(raw_img_batch[0])
@@ -266,20 +269,24 @@ for i in range(1,epochs+1):
     gl /= num_batches
     dl /= num_batches
     print(f"g-loss: {gl:.10f}, d-loss: {dl:.10f}")
-    if ((i%10)==0):
+    if ((i%5)==0):
         # save a checkpoint every 5 epochs for a history of training
         cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
         if (i%10)==0:
             cond_gan.generator.save('junoGen',overwrite=True)
             # every few checkpoints, save model.
         # every few epochs, save a an image
-        fake_image = cond_gan.generator(tf.expand_dims(x_batch[0],0)/255.0)[0]
+        raw_image = (tf.expand_dims(x_batch[0],0)-127.5)/127.5
+        fake_image = cond_gan.generator(raw_image)[0]
         fake_image = tf.cast(fake_image, tf.float16)
-        fake_image *= 255.0
+        fake_image = (fake_image * 127.5) + 127.5
+        raw_image = (raw_image[0] * 127.5) + 127.5
         #fake_images = fake_image + tf.cast(x_batch[0],tf.float16)+tf.cast(tf.ones(fake_images.shape), tf.float16)
         fake_image = fake_image.numpy().astype(np.uint8)
+        #print(fake_image.shape)
+        #print(raw_image.shape)
         imageio.imwrite('checkpoint_imgs/'+str(i)+'.png', fake_image)
-        imageio.imwrite('checkpoint_imgs/raw'+str(i)+'.png', x_batch[0].numpy().astype(np.uint8))
+        imageio.imwrite('checkpoint_imgs/raw'+str(i)+'.png', raw_image.numpy().astype(np.uint8))
 cond_gan.save_weights("ckpts/finished", overwrite=True, save_format='h5')
 cond_gan.generator.save('junoGen',overwrite=True)
 # for good measure, save again once we're done training

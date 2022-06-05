@@ -157,7 +157,7 @@ def gen():
     de1 = keras.layers.Concatenate()([en2,gen_decoder_block(num_filters*2)(res2)])
     de2 = keras.layers.Concatenate()([en1,gen_decoder_block(num_filters)(de1)])
     de3 = keras.layers.Concatenate()([input,gen_decoder_block(num_filters//2)(de2)])
-    output = keras.layers.Conv2D(num_channels,(3,3),(1,1),padding='same',activation='sigmoid',kernel_initializer=initializer)(de3)
+    output = keras.layers.Conv2D(num_channels,(3,3),(1,1),padding='same',activation='tanh',kernel_initializer=initializer)(de3)
     return keras.Model(inputs=input, outputs=output)
 
 def dis_block(filters,input):
