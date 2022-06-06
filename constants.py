@@ -13,12 +13,12 @@ epochs = 300
 num_filters = 16
 
 # custom hyperparameters
-psi = 0
+psi = 0.01
 # ^ determines how much weight we give to "content loss" vs the
 # "fooling the discriminator" loss in our generative loss function.
 # 1 means that we only care about content loss; 0 means that we only
 # care about fooling the discriminator
-chi = 0.85 # how much we care about SSIM vs L2 when creating content loss
+chi = 0.5 # how much we care about SSIM vs L2 when creating content loss
 # ^ not sure if we're even going to use L2 after all.
 
 # learning rates:

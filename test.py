@@ -24,3 +24,5 @@ print(wasserstein_loss(c,d))
 print(wasserstein_loss(d,c))
 
 #print(tf.clip_by_value(e,1))
+
+print(tf.norm(a - b))

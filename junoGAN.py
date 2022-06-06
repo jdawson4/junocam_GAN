@@ -117,9 +117,9 @@ def content_loss(fake, real):
     #print(fake)
     #print(real)
     ssim = chi * (1-tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0)))
-    l2 = (1-chi) * tf.math.reduce_mean(tf.math.squared_difference(fake, real))
+    l2 = ((1-chi) * (tf.norm((fake/(batch_size*255.0)) - (real/(batch_size*255.0)))**2))/100.0
     #print('ssim,',ssim)
-    #print('l2,',l2)
+    #print('l1,',l1)
     return tf.cast(ssim,tf.float32)+tf.cast(l2,tf.float32)
     # apparently this returns semantic dist?
     # note: SSIM measures from 0 to 1. 0 means poor quality, 1 means good
@@ -192,17 +192,18 @@ class ConditionalGAN(keras.Model):
             d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
             #d_loss *= -1
             g_loss1 = -self.g_loss_fn(fake_image_labels,g_predictions)
+            #g_loss1 *= 1000.0 # we might have to increase the importance of this loss because it's getting swamped by content_loss
             #print('compared:')
             #print(true_image_labels)
             #print(d_predictions)
-            #g_loss2 = content_loss(fake_images, raw_img_batch)
-            #g_loss2 = tf.cast(g_loss2, tf.float32)
-            #g_loss1 = tf.cast(g_loss1, tf.float32)
-            #g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
-            #g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
+            g_loss2 = content_loss(fake_images, raw_img_batch)
+            g_loss2 = tf.cast(g_loss2, tf.float32)
+            g_loss1 = tf.cast(g_loss1, tf.float32)
+            g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
+            g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
             #print(g_loss1)
             #print(g_loss2)
-            #total_g_loss = (-tf.math.abs(g_loss1) + tf.math.abs(g_loss2)) # wtf is going on
+            total_g_loss = (g_loss1 + g_loss2)
             #print(total_g_loss)
             '''g_loss = self.g_loss_fn(fake_image_labels, g_predictions)
             g_loss *= -1'''
@@ -210,12 +211,12 @@ class ConditionalGAN(keras.Model):
         self.d_optimizer.apply_gradients(
             zip(grads, self.discriminator.trainable_weights)
         )
-        grads = gtape.gradient(g_loss1, self.generator.trainable_weights)
+        grads = gtape.gradient(total_g_loss, self.generator.trainable_weights)
         self.g_optimizer.apply_gradients(
             zip(grads,self.generator.trainable_weights)
         )
 
-        self.gen_loss_tracker.update_state(g_loss1)
+        self.gen_loss_tracker.update_state(total_g_loss)
         self.dis_loss_tracker.update_state(d_loss)
 
         return {
@@ -276,7 +277,7 @@ for i in range(1,epochs+1):
     gl /= num_batches
     dl /= num_batches
     print(f"g-loss: {gl:.10f}, d-loss: {dl:.10f}")
-    if ((i%5)==0):
+    if ((i%10)==0):
         # save a checkpoint every 5 epochs for a history of training
         cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
         if (i%10)==0:
