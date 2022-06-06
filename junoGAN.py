@@ -116,7 +116,7 @@ print('\n')
 def content_loss(fake, real):
     #print(fake)
     #print(real)
-    ssim = chi *(1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
+    ssim = chi * (1-tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0)))
     l2 = (1-chi) * tf.math.reduce_mean(tf.math.squared_difference(fake, real))
     #print('ssim,',ssim)
     #print('l2,',l2)
@@ -161,54 +161,61 @@ class ConditionalGAN(keras.Model):
         # Remember: when we call fit, x should be set to the raw
         # images, and y should be set to the user-made ones.
         raw_img_batch, user_img_batch = data
-        raw_img_batch = (raw_img_batch - 127.5) / 127.5
-        user_img_batch = (user_img_batch - 127.5) / 127.5
+        #raw_img_batch = (raw_img_batch) / 255.0
+        #user_img_batch = (user_img_batch) / 255.0
+        #raw_img_batch = raw_img_batch / 255.0
+        #user_img_batch = user_img_batch / 255.0
         #print('raws',tf.math.reduce_max(raw_img_batch))
         #print('raws',tf.math.reduce_min(raw_img_batch))
+        #print('raws',tf.math.reduce_mean(raw_img_batch))
         #print('users',tf.math.reduce_max(user_img_batch))
         #print('users',tf.math.reduce_min(user_img_batch))
+        #print('users',tf.math.reduce_mean(user_img_batch))
 
         # generate labels for the real and fake images
         batch_size = tf.shape(raw_img_batch)[0]
-        true_image_labels = tf.cast(tf.zeros((batch_size,1)), tf.float32)
+        true_image_labels = -tf.cast(tf.ones((batch_size,1)), tf.float32)
         fake_image_labels = tf.cast(tf.ones((batch_size,1)), tf.float32)
-        # REMEMBER: TRUE IMAGES ARE 0, GENERATED IMAGES ARE 1
+        # REMEMBER: TRUE IMAGES ARE -1, GENERATED IMAGES ARE +1
 
-        # update: replace the above clusterfuck with a more optimized version.
-        # This is possible because GradientTapes are actually really cool.
         with tf.GradientTape() as gtape, tf.GradientTape() as dtape:
             fake_images = self.generator(raw_img_batch)
             fake_images = tf.cast(fake_images,tf.float16)
             #print('fakes',tf.math.reduce_max(fake_images))
             #print('fakes',tf.math.reduce_min(fake_images))
+            #print('fakes',tf.math.reduce_mean(fake_images))
             #fake_images = fake_images + raw_img_batch # act like a resnet
-            #print(fake_images[0])
-            #print(raw_img_batch[0])
+            #print(fake_images[0], 'fakes')
+            #print(raw_img_batch[0], 'raws')
             g_predictions = self.discriminator(fake_images)
             d_predictions = self.discriminator(user_img_batch)
-            d_loss = tf.math.abs(self.d_loss_fn(true_image_labels,d_predictions)) + tf.math.abs(self.d_loss_fn(fake_image_labels,g_predictions))
-            g_loss1 = self.g_loss_fn(fake_image_labels,g_predictions)
+            d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
+            #d_loss *= -1
+            g_loss1 = -self.g_loss_fn(fake_image_labels,g_predictions)
             #print('compared:')
             #print(true_image_labels)
             #print(d_predictions)
-            g_loss2 = content_loss(fake_images, raw_img_batch)
-            g_loss2 = tf.cast(g_loss2, tf.float32)
-            g_loss1 = tf.cast(g_loss1, tf.float32)
-            g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
-            g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
+            #g_loss2 = content_loss(fake_images, raw_img_batch)
+            #g_loss2 = tf.cast(g_loss2, tf.float32)
+            #g_loss1 = tf.cast(g_loss1, tf.float32)
+            #g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
+            #g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
             #print(g_loss1)
             #print(g_loss2)
-            total_g_loss = tf.math.add(tf.math.abs(g_loss1), tf.math.abs(g_loss2))
+            #total_g_loss = (-tf.math.abs(g_loss1) + tf.math.abs(g_loss2)) # wtf is going on
+            #print(total_g_loss)
+            '''g_loss = self.g_loss_fn(fake_image_labels, g_predictions)
+            g_loss *= -1'''
         grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
         self.d_optimizer.apply_gradients(
             zip(grads, self.discriminator.trainable_weights)
         )
-        grads = gtape.gradient(total_g_loss, self.generator.trainable_weights)
+        grads = gtape.gradient(g_loss1, self.generator.trainable_weights)
         self.g_optimizer.apply_gradients(
             zip(grads,self.generator.trainable_weights)
         )
 
-        self.gen_loss_tracker.update_state(total_g_loss)
+        self.gen_loss_tracker.update_state(g_loss1)
         self.dis_loss_tracker.update_state(d_loss)
 
         return {
@@ -220,13 +227,13 @@ class ConditionalGAN(keras.Model):
 cond_gan = ConditionalGAN(
     discriminator=discriminator, generator=generator
 )
-#def wasserstein_loss(y_true,y_pred):
-#    return tf.keras.backend.mean(y_true*y_pred)
+def wasserstein_loss(y_true,y_pred):
+    return tf.keras.backend.mean(y_true*y_pred)
 cond_gan.compile(
-    d_optimizer = tf.keras.optimizers.Adam(learning_rate = dis_learn_rate, beta_1=momentum),
-    g_optimizer = tf.keras.optimizers.Adam(learning_rate = gen_learn_rate, beta_1=momentum),
-    d_loss_fn = keras.losses.BinaryCrossentropy(from_logits=False),
-    g_loss_fn = keras.losses.BinaryCrossentropy(from_logits=False),
+    d_optimizer = tf.keras.optimizers.RMSprop(learning_rate = dis_learn_rate),
+    g_optimizer = tf.keras.optimizers.RMSprop(learning_rate = gen_learn_rate),
+    d_loss_fn = wasserstein_loss,
+    g_loss_fn = wasserstein_loss,
     run_eagerly=True
 )
 
@@ -276,17 +283,26 @@ for i in range(1,epochs+1):
             cond_gan.generator.save('junoGen',overwrite=True)
             # every few checkpoints, save model.
         # every few epochs, save a an image
-        raw_image = (tf.expand_dims(x_batch[0],0)-127.5)/127.5
+        raw_image = (tf.expand_dims(x_batch[0],0))
         fake_image = cond_gan.generator(raw_image)[0]
         fake_image = tf.cast(fake_image, tf.float16)
-        fake_image = (fake_image * 127.5) + 127.5
-        raw_image = (raw_image[0] * 127.5) + 127.5
+        #print('fake', tf.math.reduce_mean(fake_image))
+        #print('fake', tf.math.reduce_max(fake_image))
+        #print('fake', tf.math.reduce_min(fake_image))
+        #print('raw', tf.math.reduce_mean(raw_image))
+        #print('raw', tf.math.reduce_max(raw_image))
+        #print('raw', tf.math.reduce_min(raw_image))
+        #fake_image = (fake_image) * 255.0
+        #raw_image = (raw_image[0]) * 255.0
         #fake_images = fake_image + tf.cast(x_batch[0],tf.float16)+tf.cast(tf.ones(fake_images.shape), tf.float16)
         fake_image = fake_image.numpy().astype(np.uint8)
         #print(fake_image.shape)
         #print(raw_image.shape)
+        raw_image = raw_image[0].numpy().astype(np.uint8)
         imageio.imwrite('checkpoint_imgs/'+str(i)+'.png', fake_image)
-        imageio.imwrite('checkpoint_imgs/raw'+str(i)+'.png', raw_image.numpy().astype(np.uint8))
+        imageio.imwrite('checkpoint_imgs/raw'+str(i)+'.png', raw_image)
+        #print(fake_image, "fake image")
+        #print(raw_image, "raw image")
 cond_gan.save_weights("ckpts/finished", overwrite=True, save_format='h5')
 cond_gan.generator.save('junoGen',overwrite=True)
 # for good measure, save again once we're done training

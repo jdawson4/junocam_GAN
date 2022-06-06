@@ -21,9 +21,9 @@ i = 0
 for b in raw_imgs.__iter__():
     i+=1
     #print("Generating image", i)
-    fake_images = trained_gen(b/255.0)
+    fake_images = trained_gen((-127.5)/127.5)
     fake_images = tf.cast(fake_image, tf.float16)
-    fake_images *= 255.0
+    fake_images = (fake_images * 127.5) + 127.5
     #fake_images = fake_image + b+tf.cast(tf.ones(fake_images.shape), tf.float16)
     fake_images = fake_image.numpy().astype(np.uint8)
     for fake_image in fake_images:

@@ -13,7 +13,7 @@ epochs = 300
 num_filters = 16
 
 # custom hyperparameters
-psi = 0.05
+psi = 0
 # ^ determines how much weight we give to "content loss" vs the
 # "fooling the discriminator" loss in our generative loss function.
 # 1 means that we only care about content loss; 0 means that we only
@@ -24,6 +24,6 @@ chi = 0.85 # how much we care about SSIM vs L2 when creating content loss
 # learning rates:
 # some people suggest these should be the same--I find that the discriminator
 # optimizes faster, so I'll give the generator a stronger learning rate.
-gen_learn_rate = 0.0001
-dis_learn_rate = 0.0001
+gen_learn_rate = 0.00005
+dis_learn_rate = 0.00005
 momentum = 0.5
