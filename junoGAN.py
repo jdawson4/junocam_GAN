@@ -102,7 +102,8 @@ print("Approx. user imgs dataset size:", batch_size * user_imgs.cardinality().nu
 print("Batch size:", batch_size)
 #print("Latent dim used by generator is 1/"+str(latent_dim_smaller_by_factor), "of input")
 print("Value of hyperparameter psi:", psi)
-#print("Value of hyperparameter chi:", chi)
+print("Value of hyperparameter chi:", chi)
+print("Value of WGAN hyperparameter n_critic:", n_critic)
 print('g learning rate', gen_learn_rate)
 print('d learning rate', dis_learn_rate)
 print("Intended number of epochs:",epochs)
@@ -178,7 +179,20 @@ class ConditionalGAN(keras.Model):
         fake_image_labels = tf.cast(tf.ones((batch_size,1)), tf.float32)
         # REMEMBER: TRUE IMAGES ARE -1, GENERATED IMAGES ARE +1
 
-        with tf.GradientTape() as gtape, tf.GradientTape() as dtape:
+        fake_images = self.generator(raw_img_batch)
+        fake_images = tf.cast(fake_images,tf.float16)
+        for itr in range(n_critic):
+            with tf.GradientTape() as dtape:
+                g_predictions = self.discriminator(fake_images)
+                d_predictions = self.discriminator(user_img_batch)
+                d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
+            grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
+            self.d_optimizer.apply_gradients(
+                zip(grads, self.discriminator.trainable_weights)
+            )
+            self.dis_loss_tracker.update_state(d_loss)
+
+        with tf.GradientTape() as gtape:
             fake_images = self.generator(raw_img_batch)
             fake_images = tf.cast(fake_images,tf.float16)
             #print('fakes',tf.math.reduce_max(fake_images))
@@ -188,8 +202,8 @@ class ConditionalGAN(keras.Model):
             #print(fake_images[0], 'fakes')
             #print(raw_img_batch[0], 'raws')
             g_predictions = self.discriminator(fake_images)
-            d_predictions = self.discriminator(user_img_batch)
-            d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
+            #d_predictions = self.discriminator(user_img_batch)
+            #d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
             #d_loss *= -1
             g_loss1 = -self.g_loss_fn(fake_image_labels,g_predictions)
             #g_loss1 *= 1000.0 # we might have to increase the importance of this loss because it's getting swamped by content_loss
@@ -207,17 +221,17 @@ class ConditionalGAN(keras.Model):
             #print(total_g_loss)
             '''g_loss = self.g_loss_fn(fake_image_labels, g_predictions)
             g_loss *= -1'''
-        grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
+        '''grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
         self.d_optimizer.apply_gradients(
             zip(grads, self.discriminator.trainable_weights)
-        )
+        )'''
         grads = gtape.gradient(total_g_loss, self.generator.trainable_weights)
         self.g_optimizer.apply_gradients(
             zip(grads,self.generator.trainable_weights)
         )
 
         self.gen_loss_tracker.update_state(total_g_loss)
-        self.dis_loss_tracker.update_state(d_loss)
+        #self.dis_loss_tracker.update_state(d_loss)
 
         return {
             'g_loss': self.gen_loss_tracker.result(),
@@ -277,7 +291,7 @@ for i in range(1,epochs+1):
     gl /= num_batches
     dl /= num_batches
     print(f"g-loss: {gl:.10f}, d-loss: {dl:.10f}")
-    if ((i%10)==0):
+    if ((i%5)==0):
         # save a checkpoint every 5 epochs for a history of training
         cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
         if (i%10)==0:

@@ -31,7 +31,7 @@ def resnetBlock(filters,input):
     output = keras.layers.LeakyReLU(alpha=0.2)(output)
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(output)
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.LeakyReLU(alpha=0.2)(output)
+    output = keras.layers.Activation('relu')(output)
     return keras.layers.Add()([input,output])
 
 # ok that's not working too well. Let's try this:
@@ -41,7 +41,7 @@ def simpleConvBlock(filters,input):
     output = keras.layers.LeakyReLU(alpha=0.2)(output)
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(output)
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.LeakyReLU(alpha=0.2)(output)
+    output = keras.layers.Activation('relu')(output)
     return output
 
 # helper for gen()
@@ -52,7 +52,7 @@ def gen_encoder_block(n,batchnorm=True):
     if batchnorm:
         # optionally batchnormalize
         t.add(keras.layers.BatchNormalization(momentum=0.85))
-    t.add(keras.layers.LeakyReLU(alpha=0.2))
+    t.add(keras.layers.Activation('relu'))
     return t
 
 # helper for gen()
@@ -63,39 +63,41 @@ def gen_decoder_block(n):
     # always do batch normalization
     t.add(keras.layers.BatchNormalization(momentum=0.85))
     # activation:
-    t.add(keras.layers.LeakyReLU(alpha=0.2))
+    t.add(keras.layers.Activation('relu'))
     return t
 
 # decided to make this whole thing residual.
 def gen():
     input = keras.layers.Input(shape=(image_size,image_size,num_channels),dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/255.0,offset=0)(input) # scale to between 0 and 1
-    en1 = gen_encoder_block(num_filters//2)(scale)
+    en1 = gen_encoder_block(num_filters//2, batchnorm=False)(scale)
     en2 = gen_encoder_block(num_filters)(en1)
     en3 = gen_encoder_block(num_filters*2)(en2)
     res1 = simpleConvBlock(num_filters*2,en3)
     res2 = simpleConvBlock(num_filters*2,res1)
-    de1 = keras.layers.Add()([en2,gen_decoder_block(num_filters)(res2)])
-    de2 = keras.layers.Add()([en1,gen_decoder_block(num_filters//2)(de1)])
-    de3 = keras.layers.Add()([scale,gen_decoder_block(num_channels)(de2)])
-    output = keras.layers.Conv2D(num_channels,(3,3),(1,1),padding='same',activation='tanh')(de3)
-    #output = keras.layers.Rescaling(0.5, offset = 1.0)(output)
-    #output = keras.layers.Activation()(output)
-    output = keras.layers.Lambda(lambda x: tf.keras.activations.relu(x,threshold=-1, max_value=1))(output) # outputs should be between 0 and 1
-    #output = keras.layers.Lambda(hardFloor)(output)
-    output = keras.layers.Rescaling(510.0)(output) # rescale up to 255
+    drop = keras.layers.Dropout(0.25)(res2)
+    de1 = keras.layers.Dropout(0.3)(keras.layers.Concatenate()([en2,gen_decoder_block(num_filters)(drop)]))
+    de2 = keras.layers.Dropout(0.3)(keras.layers.Concatenate()([en1,keras.layers.UpSampling2D()(de1)]))
+    de3 = keras.layers.Dropout(0.3)(keras.layers.Concatenate()([scale,keras.layers.UpSampling2D()(de2)]))
+    output1 = keras.layers.Conv2D(num_channels,(1,1),(1,1),padding='same',activation='relu')(de3)
+    output2 = keras.layers.Conv2D(num_channels,(3,3),(1,1),padding='same',activation='relu')(de3)
+    output3 = keras.layers.Conv2D(num_channels,(5,5),(1,1),padding='same',activation='relu')(de3)
+    output = keras.layers.Add()([output1,output2,output3])
+    #output = keras.layers.Lambda(lambda x: tf.keras.activations.relu(x,threshold=0, max_value=1))(output) # outputs should be between 0 and 1
+    output = keras.layers.Rescaling(255)(output) # rescale up to 255
     return keras.Model(inputs=input, outputs=output,name='generator')
 
-def dis_block(filters,input):
+def dis_block(filters,input,batchnorm=True):
     output = keras.layers.Conv2D(filters,(3,3),(2,2),padding='same', kernel_constraint=const)(input)
-    output = keras.layers.BatchNormalization(momentum=0.85)(output)
+    if batchnorm:
+        output = keras.layers.BatchNormalization(momentum=0.85)(output)
     output = keras.layers.LeakyReLU(alpha=0.2)(output)
     return output
 
 def dis():
     input = keras.layers.Input(shape=(image_size,image_size,num_channels),dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/127.5,offset=-1)(input)
-    out = dis_block(num_filters//4,scale)
+    out = dis_block(num_filters//3,scale,batchnorm=False)
     out = dis_block(num_filters//3,out)
     out = dis_block(num_filters//2,out)
     out = dis_block(num_filters,out)

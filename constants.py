@@ -5,12 +5,13 @@
 #
 # CONSTANTS
 seed = 3 # my lucky number!
-batch_size = 16 # unsure what my computer can handle haha
+batch_size = 8 # unsure what my computer can handle haha
 num_channels = 3 # rgb baby
 image_size = 256
 # each raw image is 1600x1600. I think each output should be too
 epochs = 300
-num_filters = 16
+num_filters = 8
+n_critic = 5 # the number of times we'll train the discriminator before going on to the generator
 
 # custom hyperparameters
 psi = 0.01
