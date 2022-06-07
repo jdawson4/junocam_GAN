@@ -113,14 +113,9 @@ print('\n')
 print('######################################################################')
 print('\n')
 
-#mse = tf.keras.losses.MeanSquaredError()
 def content_loss(fake, real):
-    #print(fake)
-    #print(real)
     ssim = chi * (1-tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0)))
     l2 = ((1-chi) * (tf.norm((fake/(batch_size*255.0)) - (real/(batch_size*255.0)))**2))/100.0
-    #print('ssim,',ssim)
-    #print('l1,',l1)
     return tf.cast(ssim,tf.float32)+tf.cast(l2,tf.float32)
     # apparently this returns semantic dist?
     # note: SSIM measures from 0 to 1. 0 means poor quality, 1 means good
@@ -162,16 +157,6 @@ class ConditionalGAN(keras.Model):
         # Remember: when we call fit, x should be set to the raw
         # images, and y should be set to the user-made ones.
         raw_img_batch, user_img_batch = data
-        #raw_img_batch = (raw_img_batch) / 255.0
-        #user_img_batch = (user_img_batch) / 255.0
-        #raw_img_batch = raw_img_batch / 255.0
-        #user_img_batch = user_img_batch / 255.0
-        #print('raws',tf.math.reduce_max(raw_img_batch))
-        #print('raws',tf.math.reduce_min(raw_img_batch))
-        #print('raws',tf.math.reduce_mean(raw_img_batch))
-        #print('users',tf.math.reduce_max(user_img_batch))
-        #print('users',tf.math.reduce_min(user_img_batch))
-        #print('users',tf.math.reduce_mean(user_img_batch))
 
         # generate labels for the real and fake images
         batch_size = tf.shape(raw_img_batch)[0]
@@ -185,7 +170,6 @@ class ConditionalGAN(keras.Model):
             with tf.GradientTape() as dtape:
                 g_predictions = self.discriminator(fake_images)
                 d_predictions = self.discriminator(user_img_batch)
-                #print(g_predictions, d_predictions)
                 d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
             grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(
@@ -196,43 +180,19 @@ class ConditionalGAN(keras.Model):
         with tf.GradientTape() as gtape:
             fake_images = self.generator(raw_img_batch)
             fake_images = tf.cast(fake_images,tf.float16)
-            #print('fakes',tf.math.reduce_max(fake_images))
-            #print('fakes',tf.math.reduce_min(fake_images))
-            #print('fakes',tf.math.reduce_mean(fake_images))
-            #fake_images = fake_images + raw_img_batch # act like a resnet
-            #print(fake_images[0], 'fakes')
-            #print(raw_img_batch[0], 'raws')
             g_predictions = self.discriminator(fake_images)
-            #d_predictions = self.discriminator(user_img_batch)
-            #d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
-            #d_loss *= -1
             wganLoss = -self.g_loss_fn(fake_image_labels,g_predictions)
-            #g_loss1 *= 1000.0 # we might have to increase the importance of this loss because it's getting swamped by content_loss
-            #print('compared:')
-            #print(true_image_labels)
-            #print(d_predictions)
             contentLoss = content_loss(fake_images, raw_img_batch)
             contentLoss = tf.cast(contentLoss, tf.float32)
             wganLoss = tf.cast(wganLoss, tf.float32)
             wganLoss = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * wganLoss
             contentLoss = tf.convert_to_tensor(psi, dtype=tf.float32) * contentLoss
-            #print(g_loss1)
-            #print(g_loss2)
             total_g_loss = (wganLoss + contentLoss)
-            #print(total_g_loss)
-            '''g_loss = self.g_loss_fn(fake_image_labels, g_predictions)
-            g_loss *= -1'''
-        '''grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
-        self.d_optimizer.apply_gradients(
-            zip(grads, self.discriminator.trainable_weights)
-        )'''
         grads = gtape.gradient(total_g_loss, self.generator.trainable_weights)
         self.g_optimizer.apply_gradients(
             zip(grads,self.generator.trainable_weights)
         )
-
         self.gen_loss_tracker.update_state(total_g_loss)
-        #self.dis_loss_tracker.update_state(d_loss)
 
         return {
             'g_loss': self.gen_loss_tracker.result(),
@@ -288,8 +248,6 @@ for i in range(1,epochs+1):
         dl += metrics['d_loss']
         wloss += metrics['GAN_loss']
         contloss += metrics['content_loss']
-        #print(dl)
-        #print(gl)
         #if (j%64==0):
         #    b_g_loss = metrics['g_loss']
         #    b_d_loss = metrics['d_loss']
@@ -313,24 +271,11 @@ for i in range(1,epochs+1):
         # every few epochs, save a an image
         raw_image = (tf.expand_dims(x_batch[0],0))
         fake_image = cond_gan.generator(raw_image)[0]
-        fake_image = tf.cast(fake_image, tf.float16)
-        #print('fake', tf.math.reduce_mean(fake_image))
-        #print('fake', tf.math.reduce_max(fake_image))
-        #print('fake', tf.math.reduce_min(fake_image))
-        #print('raw', tf.math.reduce_mean(raw_image))
-        #print('raw', tf.math.reduce_max(raw_image))
-        #print('raw', tf.math.reduce_min(raw_image))
-        #fake_image = (fake_image) * 255.0
-        #raw_image = (raw_image[0]) * 255.0
-        #fake_images = fake_image + tf.cast(x_batch[0],tf.float16)+tf.cast(tf.ones(fake_images.shape), tf.float16)
+        #fake_image = tf.cast(fake_image, tf.float16) # do we need to do this??? Worried about floating point math.
         fake_image = fake_image.numpy().astype(np.uint8)
-        #print(fake_image.shape)
-        #print(raw_image.shape)
         raw_image = raw_image[0].numpy().astype(np.uint8)
         imageio.imwrite('checkpoint_imgs/'+str(i)+'.png', fake_image)
         imageio.imwrite('checkpoint_imgs/raw'+str(i)+'.png', raw_image)
-        #print(fake_image, "fake image")
-        #print(raw_image, "raw image")
 cond_gan.save_weights("ckpts/finished", overwrite=True, save_format='h5')
 cond_gan.generator.save('junoGen',overwrite=True)
 # for good measure, save again once we're done training
