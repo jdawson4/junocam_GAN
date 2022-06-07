@@ -48,7 +48,7 @@ def simpleConvBlock(filters,input):
 def gen_encoder_block(n,batchnorm=True):
     t = keras.Sequential()
     # downsample:
-    t.add(keras.layers.Conv2D(n, (4,4), strides=(2,2), padding='same'))
+    t.add(keras.layers.Conv2D(n, (2,2), strides=(2,2), padding='same'))
     if batchnorm:
         # optionally batchnormalize
         t.add(keras.layers.BatchNormalization(momentum=0.85))
@@ -59,7 +59,7 @@ def gen_encoder_block(n,batchnorm=True):
 def gen_decoder_block(n):
     t=keras.Sequential()
     # upsample:
-    t.add(keras.layers.Conv2DTranspose(n, (4,4), strides=(2,2), padding='same'))
+    t.add(keras.layers.Conv2DTranspose(n, (2,2), strides=(2,2), padding='same'))
     # always do batch normalization
     t.add(keras.layers.BatchNormalization(momentum=0.85))
     # activation:
@@ -88,7 +88,7 @@ def gen():
     return keras.Model(inputs=input, outputs=output,name='generator')
 
 def dis_block(filters,input,batchnorm=True):
-    output = keras.layers.Conv2D(filters,(4,4),(2,2),padding='same', kernel_constraint=const)(input)
+    output = keras.layers.Conv2D(filters,(2,2),(2,2),padding='valid', kernel_constraint=const)(input)
     if batchnorm:
         output = keras.layers.BatchNormalization(momentum=0.85)(output)
     output = keras.layers.LeakyReLU(alpha=0.2)(output)

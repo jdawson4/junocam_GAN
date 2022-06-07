@@ -245,6 +245,8 @@ cond_gan = ConditionalGAN(
     discriminator=discriminator, generator=generator
 )
 def wasserstein_loss(y_true,y_pred):
+    #print(y_true, y_pred)
+    #print(tf.keras.backend.mean(y_true*y_pred))
     return tf.keras.backend.mean(y_true*y_pred)
 cond_gan.compile(
     d_optimizer = tf.keras.optimizers.RMSprop(learning_rate = dis_learn_rate),
