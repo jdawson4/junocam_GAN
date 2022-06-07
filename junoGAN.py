@@ -205,19 +205,19 @@ class ConditionalGAN(keras.Model):
             #d_predictions = self.discriminator(user_img_batch)
             #d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
             #d_loss *= -1
-            g_loss1 = -self.g_loss_fn(fake_image_labels,g_predictions)
+            wganLoss = -self.g_loss_fn(fake_image_labels,g_predictions)
             #g_loss1 *= 1000.0 # we might have to increase the importance of this loss because it's getting swamped by content_loss
             #print('compared:')
             #print(true_image_labels)
             #print(d_predictions)
-            g_loss2 = content_loss(fake_images, raw_img_batch)
-            g_loss2 = tf.cast(g_loss2, tf.float32)
-            g_loss1 = tf.cast(g_loss1, tf.float32)
-            g_loss1 = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * g_loss1
-            g_loss2 = tf.convert_to_tensor(psi, dtype=tf.float32) * g_loss2
+            contentLoss = content_loss(fake_images, raw_img_batch)
+            contentLoss = tf.cast(contentLoss, tf.float32)
+            wganLoss = tf.cast(wganLoss, tf.float32)
+            wganLoss = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * wganLoss
+            contentLoss = tf.convert_to_tensor(psi, dtype=tf.float32) * contentLoss
             #print(g_loss1)
             #print(g_loss2)
-            total_g_loss = (g_loss1 + g_loss2)
+            total_g_loss = (wganLoss + contentLoss)
             #print(total_g_loss)
             '''g_loss = self.g_loss_fn(fake_image_labels, g_predictions)
             g_loss *= -1'''
@@ -236,6 +236,8 @@ class ConditionalGAN(keras.Model):
         return {
             'g_loss': self.gen_loss_tracker.result(),
             'd_loss': self.dis_loss_tracker.result(),
+            'GAN_loss': wganLoss,
+            'content_loss': contentLoss
         }
 
 # okay... let's try to use this thing:
@@ -266,6 +268,8 @@ for i in range(1,epochs+1):
     print("Epoch", str(i), end=' ')
     gl = 0.0
     dl = 0.0
+    wloss = 0.0
+    contloss = 0.0
     a = raw_imgs.__iter__()
     b = user_imgs.__iter__()
     num_batches = tf.get_static_value(raw_imgs.cardinality())
@@ -279,6 +283,8 @@ for i in range(1,epochs+1):
         )
         gl += metrics['g_loss']
         dl += metrics['d_loss']
+        wloss += metrics['GAN_loss']
+        contloss += metrics['content_loss']
         #print(dl)
         #print(gl)
         #if (j%64==0):
@@ -288,9 +294,13 @@ for i in range(1,epochs+1):
         #    print(f'Batch {j} g{b_g_loss:.4f} d{b_d_loss:.4f},', end=' ')
     gl = tf.cast(gl, tf.float32) # sometimes this breaks? Unsure why.
     dl = tf.cast(dl, tf.float32)
+    wloss = tf.cast(wloss, tf.float32)
+    contloss = tf.cast(contloss, tf.float32)
     gl /= num_batches
     dl /= num_batches
-    print(f"g-loss: {gl:.10f}, d-loss: {dl:.10f}")
+    wloss /= num_batches
+    contloss /= num_batches
+    print(f"g-loss: {gl:.10f}, d-loss: {dl:.10f}, GAN loss: {wloss:.10f}, content loss: {contloss:.10f}")
     if ((i%5)==0):
         # save a checkpoint every 5 epochs for a history of training
         cond_gan.save_weights("ckpts/ckpt"+str(i), overwrite=True, save_format='h5')
