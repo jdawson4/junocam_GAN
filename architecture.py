@@ -87,28 +87,45 @@ def gen():
     output = keras.layers.Rescaling(255)(output) # rescale up to 255
     return keras.Model(inputs=input, outputs=output,name='generator')
 
+def hasNan(x, number):
+    def p(num): print(num,'has a nan!')
+    def q(num): pass
+    tf.cond(pred=tf.math.reduce_any((tf.math.is_nan(x))), true_fn=lambda:p(number), false_fn=lambda:q(number))
+    #f(number)
+    return x
+
 def dis_block(filters,input,batchnorm=True):
     output = keras.layers.Conv2D(filters,(2,2),(2,2),padding='valid', kernel_constraint=const)(input)
     if batchnorm:
         output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    #output = keras.layers.LeakyReLU(alpha=0.2)(output)
-    output = keras.layers.Activation('relu')(output)
+    output = keras.layers.LeakyReLU(alpha=0.2)(output)
+    #output = keras.layers.Activation('relu')(output)
     return output
 
 def dis():
     input = keras.layers.Input(shape=(image_size,image_size,num_channels),dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/127.5,offset=-1)(input)
     out = dis_block(num_channels*2,scale,batchnorm=False)
+    #out = keras.layers.Lambda(lambda x:hasNan(x,1))(out)
     out = dis_block(num_channels*3,out)
+    #out = keras.layers.Lambda(lambda x:hasNan(x,2))(out)
     out = dis_block(num_channels*4,out)
+    #out = keras.layers.Lambda(lambda x:hasNan(x,3))(out)
     out = dis_block(num_channels*5,out)
+    #out = keras.layers.Lambda(lambda x:hasNan(x,4))(out)
     out = dis_block(num_channels*6,out)
+    #out = keras.layers.Lambda(lambda x:hasNan(x,5))(out)
     out = dis_block(num_channels*7,out)
+    #out = keras.layers.Lambda(lambda x:hasNan(x,6))(out)
     out = dis_block(num_channels*8,out)
+    #out = keras.layers.Lambda(lambda x:hasNan(x,7))(out)
     out = keras.layers.Flatten()(out)
-    out = keras.layers.Lambda(lambda x: tf.math.multiply_no_nan(x, tf.dtypes.cast(tf.math.logical_not(tf.math.is_nan(x)), dtype=tf.float32)))(out)
+    out = keras.layers.Dropout(0.2)(out)
+    #out = keras.layers.Lambda(lambda x:hasNan(x,8))(out)
+    #out = keras.layers.Lambda(lambda x: tf.math.multiply_no_nan(x, tf.dtypes.cast(tf.math.logical_not(tf.math.is_nan(x)), dtype=tf.float32)))(out)
     out = keras.layers.Dense(1, kernel_constraint=None)(out)
-    out = keras.layers.PReLU()(out)
+    #out = keras.layers.Lambda(lambda x:hasNan(x,9))(out)
+    #out = keras.layers.PReLU()(out)
     return keras.Model(inputs=input,outputs=out,name='discriminator')
 
 if __name__=='__main__':

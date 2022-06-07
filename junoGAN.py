@@ -59,7 +59,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # The data on my computer is nearly 600 MB...
 # I'm not sure if this is a great idea:
-raw_imgs = keras.preprocessing.image_dataset_from_directory(
+raw_imgs = keras.utils.image_dataset_from_directory(
     "raw_imgs/",
     labels = None,
     color_mode = 'rgb',
@@ -68,7 +68,7 @@ raw_imgs = keras.preprocessing.image_dataset_from_directory(
     shuffle=True,
     seed = seed
 )
-user_imgs = keras.preprocessing.image_dataset_from_directory(
+user_imgs = keras.utils.image_dataset_from_directory(
     "user_imgs/",
     labels = None,
     color_mode = 'rgb',
