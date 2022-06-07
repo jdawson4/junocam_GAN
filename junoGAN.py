@@ -185,6 +185,7 @@ class ConditionalGAN(keras.Model):
             with tf.GradientTape() as dtape:
                 g_predictions = self.discriminator(fake_images)
                 d_predictions = self.discriminator(user_img_batch)
+                #print(g_predictions, d_predictions)
                 d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
             grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(

@@ -28,7 +28,7 @@ def resnetBlock(filters,input):
     # this will simply do a little convoluting, retaining shape.
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(input)
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.LeakyReLU(alpha=0.2)(output)
+    output = keras.layers.Activation('relu')(output)
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(output)
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
     output = keras.layers.Activation('relu')(output)
@@ -38,7 +38,7 @@ def resnetBlock(filters,input):
 def simpleConvBlock(filters,input):
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(input)
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.LeakyReLU(alpha=0.2)(output)
+    output = keras.layers.Activation('relu')(output)
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(output)
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
     output = keras.layers.Activation('relu')(output)
@@ -91,7 +91,8 @@ def dis_block(filters,input,batchnorm=True):
     output = keras.layers.Conv2D(filters,(2,2),(2,2),padding='valid', kernel_constraint=const)(input)
     if batchnorm:
         output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.LeakyReLU(alpha=0.2)(output)
+    #output = keras.layers.LeakyReLU(alpha=0.2)(output)
+    output = keras.layers.Activation('relu')(output)
     return output
 
 def dis():
@@ -104,8 +105,9 @@ def dis():
     out = dis_block(num_channels*6,out)
     out = dis_block(num_channels*7,out)
     out = dis_block(num_channels*8,out)
-    out = keras.layers.GlobalMaxPooling2D()(out)
+    out = keras.layers.Flatten()(out)
     out = keras.layers.Dense(1, kernel_constraint=const)(out)
+    out = keras.layers.PReLU()(out)
     return keras.Model(inputs=input,outputs=out,name='discriminator')
 
 if __name__=='__main__':

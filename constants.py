@@ -14,7 +14,7 @@ num_filters = 8
 n_critic = 4 # the number of times we'll train the discriminator before going on to the generator
 
 # custom hyperparameters
-psi = 0.01
+psi = 0
 # ^ determines how much weight we give to "content loss" vs the
 # "fooling the discriminator" loss in our generative loss function.
 # 1 means that we only care about content loss; 0 means that we only
