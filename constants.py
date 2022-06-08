@@ -15,12 +15,12 @@ n_critic = 5 # the number of times we'll train the discriminator before going on
 # ^ the original paper chose 5
 
 # custom hyperparameters
-psi = 0.001 # REALLY small because otherwise it swamps GAN loss
+psi = 0.01 # REALLY small because otherwise it swamps GAN loss
 # ^ determines how much weight we give to "content loss" vs the
 # "fooling the discriminator" loss in our generative loss function.
 # 1 means that we only care about content loss; 0 means that we only
 # care about fooling the discriminator
-chi = 0.5 # how much we care about SSIM vs L2 when creating content loss
+chi = 0 # how much we care about SSIM vs L2 when creating content loss
 # ^ not sure if we're even going to use L2 after all.
 
 # learning rates:

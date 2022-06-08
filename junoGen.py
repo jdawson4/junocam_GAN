@@ -21,8 +21,10 @@ i = 0
 for b in raw_imgs.__iter__():
     i+=1
     #print("Generating image", i)
-    fake_images = trained_gen(b[0])[0]
-    fake_images = tf.cast(fake_image, tf.float16)
-    fake_images = fake_image.numpy().astype(np.uint8)
+    fake_images = trained_gen(b)
+    fake_images = tf.cast(fake_images, tf.float16)
+    fake_images = fake_images.numpy().astype(np.uint8)
     for fake_image in fake_images:
+        # sorta weird to loop like this but keras outputs a list of length 1,
+        # so just go with it
         imageio.imwrite('fake_images/'+str(i)+'.png', fake_image)

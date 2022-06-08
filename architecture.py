@@ -106,7 +106,7 @@ def hasNan(x, number):
     return x
 
 def dis_block(filters,input,batchnorm=True):
-    output = keras.layers.Conv2D(filters,(4,4),(2,2),padding='valid', kernel_constraint=const)(input)
+    output = keras.layers.Conv2D(filters,(2,2),(2,2),padding='valid', kernel_constraint=const)(input)
     if batchnorm:
         output = keras.layers.BatchNormalization(momentum=0.85)(output)
     output = keras.layers.LeakyReLU(alpha=0.2)(output)

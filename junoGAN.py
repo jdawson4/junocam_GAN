@@ -115,8 +115,8 @@ print('\n')
 
 def content_loss(fake, real):
     ssim = chi * (1-tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0)))
-    l2 = ((1-chi) * (tf.norm((fake/(batch_size*255.0)) - (real/(batch_size*255.0)))**2))/100.0
-    return tf.cast(ssim,tf.float32)+tf.cast(l2,tf.float32)
+    l1 = ((1-chi) * tf.norm((fake/(batch_size*255.0)) - (real/(batch_size*255.0))))
+    return tf.cast(ssim,tf.float32)+tf.cast(l1,tf.float32)
     # apparently this returns semantic dist?
     # note: SSIM measures from 0 to 1. 0 means poor quality, 1 means good
     # quality. We want loss to be 1-ssim, so that we encourage good quality,#
