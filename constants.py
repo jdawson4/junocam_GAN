@@ -5,9 +5,9 @@
 #
 # CONSTANTS
 seed = 3 # my lucky number!
-batch_size = 4 # unsure what my computer can handle haha
+batch_size = 1 # unsure what my computer can handle haha
 num_channels = 3 # rgb baby
-image_size = 400
+image_size = 800
 # each raw image is 1600x1600. I think each output should be too
 epochs = 300
 #num_filters = 8 # this no longer filters into architecture--it's all based around num_channels now.
