@@ -62,7 +62,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 raw_imgs = keras.utils.image_dataset_from_directory(
     "raw_imgs/",
     labels = None,
-    color_mode = 'rgb',
+    color_mode = 'rgba',
     batch_size = batch_size,
     image_size = (image_size, image_size),
     shuffle=True,
@@ -71,7 +71,7 @@ raw_imgs = keras.utils.image_dataset_from_directory(
 user_imgs = keras.utils.image_dataset_from_directory(
     "user_imgs/",
     labels = None,
-    color_mode = 'rgb',
+    color_mode = 'rgba',
     batch_size = batch_size,
     image_size = (image_size, image_size), # force everything to be this size?
     shuffle=True,
