@@ -116,7 +116,9 @@ print('\n')
 def content_loss(fake, real):
     ssim = chi * (1-tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0)))
     l1 = ((1-chi) * tf.norm((fake/(batch_size*255.0)) - (real/(batch_size*255.0))))
-    return tf.cast(ssim,tf.float32)+tf.cast(l1,tf.float32)
+    cont_loss = tf.cast(ssim,tf.float32)+tf.cast(l1,tf.float32)
+    #print('cont_loss:',cont_loss)
+    return cont_loss
     # apparently this returns semantic dist?
     # note: SSIM measures from 0 to 1. 0 means poor quality, 1 means good
     # quality. We want loss to be 1-ssim, so that we encourage good quality,#
@@ -128,12 +130,13 @@ def content_loss(fake, real):
     #return (1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
 # and here we create teh ConditionalGAN itself. Exciting!
 class ConditionalGAN(keras.Model):
-    def __init__(self,discriminator, generator):
+    def __init__(self,discriminator, generator, gp_weight = 10.0):
         super(ConditionalGAN, self).__init__()
         self.discriminator = discriminator
         self.generator = generator
         self.gen_loss_tracker = keras.metrics.Mean(name='generator_loss')
         self.dis_loss_tracker = keras.metrics.Mean(name='discriminator_loss')
+        self.gp_weight = gp_weight
 
     @property # no idea what this does
     def metrics(self):
@@ -146,6 +149,20 @@ class ConditionalGAN(keras.Model):
         self.d_loss_fn = d_loss_fn
         self.g_loss_fn = g_loss_fn
         #self.epoch_num = 0
+
+    def gradient_penalty(self, batch_size, real_images, fake_images):
+        alpha = tf.random.normal([batch_size,1,1,1],0.0,1.0,seed=seed)
+        diff = fake_images - real_images
+        interpolated = real_images + alpha * diff
+
+        with tf.GradientTape() as gp_tape:
+            gp_tape.watch(interpolated)
+            pred = self.discriminator(interpolated, training=True)
+        grads = gp_tape.gradient(pred, [interpolated])[0]
+        norm = tf.sqrt(tf.reduce_sum(tf.square(grads), axis=[1,2,3]))
+        gp = tf.reduce_mean((norm-1.0)**2)
+        #print('gp:',gp)
+        return gp
 
     def train_step(self, data):
         #self.epoch_num+=1
@@ -164,13 +181,15 @@ class ConditionalGAN(keras.Model):
         fake_image_labels = tf.cast(tf.ones((batch_size,1)), tf.float32)
         # REMEMBER: TRUE IMAGES ARE -1, GENERATED IMAGES ARE +1
 
-        fake_images = self.generator(raw_img_batch)
-        fake_images = tf.cast(fake_images,tf.float16)
         for itr in range(n_critic):
             with tf.GradientTape() as dtape:
-                g_predictions = self.discriminator(fake_images)
-                d_predictions = self.discriminator(user_img_batch)
+                fake_images = self.generator(raw_img_batch, training=True)
+                #fake_images = tf.cast(fake_images,tf.float16)
+                g_predictions = self.discriminator(fake_images, training=True)
+                d_predictions = self.discriminator(user_img_batch, training=True)
                 d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
+                gp = tf.cast(self.gradient_penalty(batch_size, user_img_batch, fake_images), tf.float32)
+                d_loss = tf.cast(d_loss,tf.float32) + gp * tf.cast(self.gp_weight, tf.float32)
             grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(
                 zip(grads, self.discriminator.trainable_weights)
@@ -178,9 +197,11 @@ class ConditionalGAN(keras.Model):
             self.dis_loss_tracker.update_state(d_loss)
 
         with tf.GradientTape() as gtape:
-            fake_images = self.generator(raw_img_batch)
-            fake_images = tf.cast(fake_images,tf.float16)
-            g_predictions = self.discriminator(fake_images)
+            fake_images = self.generator(raw_img_batch, training=True)
+            #fake_images = tf.cast(fake_images,tf.float16)
+            #print(tf.math.reduce_max(fake_images))
+            #print(tf.math.reduce_min(fake_images))
+            g_predictions = self.discriminator(fake_images, training=True)
             wganLoss = -self.g_loss_fn(fake_image_labels,g_predictions)
             contentLoss = content_loss(fake_images, raw_img_batch)
             contentLoss = tf.cast(contentLoss, tf.float32)
@@ -207,11 +228,14 @@ cond_gan = ConditionalGAN(
 )
 def wasserstein_loss(y_true,y_pred):
     #print(y_true, y_pred)
-    #print(tf.keras.backend.mean(y_true*y_pred))
-    return tf.keras.backend.mean(y_true*y_pred)
+    w_loss = tf.keras.backend.mean(y_true*y_pred)
+    #print('w_loss:',w_loss)
+    return w_loss
 cond_gan.compile(
     d_optimizer = tf.keras.optimizers.RMSprop(learning_rate = dis_learn_rate),
     g_optimizer = tf.keras.optimizers.RMSprop(learning_rate = gen_learn_rate),
+    #d_optimizer = tf.keras.optimizers.Adam(learning_rate = dis_learn_rate, beta_1=0.5, beta_2=0.9),
+    #g_optimizer = tf.keras.optimizers.Adam(learning_rate = gen_learn_rate, beta_1=0.5, beta_2=0.9),
     d_loss_fn = wasserstein_loss,
     g_loss_fn = wasserstein_loss,
     run_eagerly=True
@@ -237,8 +261,10 @@ for i in range(1,epochs+1):
     b = user_imgs.__iter__()
     num_batches = tf.get_static_value(raw_imgs.cardinality())
     for j in range(num_batches):
-        x_batch = tf.cast(a.get_next(), tf.float16)
-        y_batch = tf.cast(b.get_next(), tf.float16)
+        #x_batch = tf.cast(a.get_next(), tf.float16)
+        #y_batch = tf.cast(b.get_next(), tf.float16)
+        x_batch = a.get_next()
+        y_batch = b.get_next()
         metrics = cond_gan.train_on_batch(
             x=x_batch,
             y=y_batch,
