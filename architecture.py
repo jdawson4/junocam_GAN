@@ -112,6 +112,18 @@ def dis_block(filters,input,batchnorm=True):
     #output = keras.layers.Activation('relu')(output)
     return output
 
+# this describes internal convolutions for the discriminator
+def discConvBlock(filters,input):
+    output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const)(input) # 3x3 because these are in a small latent space.
+    output = keras.layers.BatchNormalization(momentum=0.85)(output)
+    #output = keras.layers.Activation('relu')(output)
+    output = (keras.layers.LeakyReLU())(output)
+    output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(output)
+    output = keras.layers.BatchNormalization(momentum=0.85)(output)
+    #output = keras.layers.Activation('relu')(output)
+    output = (keras.layers.LeakyReLU())(output)
+    return output
+
 def dis():
     input = keras.layers.Input(shape=(image_size,image_size,num_channels),dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/127.5,offset=-1)(input)
@@ -140,15 +152,15 @@ def dis():
     #out = keras.layers.Lambda(lambda x:hasNan(x,6))(out)
     #out = dis_block(num_channels*11,out)
     #out = keras.layers.Lambda(lambda x:hasNan(x,7))(out)
-    out = simpleConvBlock(24, out)
-    out = simpleConvBlock(32, out)
-    out = simpleConvBlock(32, out)
-    out = simpleConvBlock(32, out)
+    out = discConvBlock(24, out)
+    out = discConvBlock(32, out)
+    out = discConvBlock(32, out)
+    out = discConvBlock(32, out)
     out = keras.layers.Flatten()(out)
     #out = keras.layers.Dropout(0.2)(out)
     #out = keras.layers.Lambda(lambda x:hasNan(x,8))(out)
     #out = keras.layers.Lambda(lambda x: tf.math.multiply_no_nan(x, tf.dtypes.cast(tf.math.logical_not(tf.math.is_nan(x)), dtype=tf.float32)))(out)
-    out = keras.layers.Dense(1, kernel_constraint=None)(out)
+    out = keras.layers.Dense(1, kernel_constraint=const)(out)
     #out = keras.layers.Lambda(lambda x:hasNan(x,9))(out)
     #out = keras.layers.PReLU()(out)
     return keras.Model(inputs=input,outputs=out,name='discriminator')
