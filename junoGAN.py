@@ -56,6 +56,7 @@ num_gpus = len(physical_devices)
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 # The data on my computer is nearly 600 MB...
 # I'm not sure if this is a great idea:
@@ -164,12 +165,12 @@ class ConditionalGAN(keras.Model):
         fake_image_labels = tf.cast(tf.ones((batch_size,1)), tf.float32)
         # REMEMBER: TRUE IMAGES ARE -1, GENERATED IMAGES ARE +1
 
-        fake_images = self.generator(raw_img_batch)
+        fake_images = self.generator(raw_img_batch, training=True)
         fake_images = tf.cast(fake_images,tf.float16)
         for itr in range(n_critic):
             with tf.GradientTape() as dtape:
-                g_predictions = self.discriminator(fake_images)
-                d_predictions = self.discriminator(user_img_batch)
+                g_predictions = self.discriminator(fake_images, training=True)
+                d_predictions = self.discriminator(user_img_batch, training=True)
                 d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
             grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(
@@ -178,9 +179,9 @@ class ConditionalGAN(keras.Model):
             self.dis_loss_tracker.update_state(d_loss)
 
         with tf.GradientTape() as gtape:
-            fake_images = self.generator(raw_img_batch)
+            fake_images = self.generator(raw_img_batch, training=True)
             fake_images = tf.cast(fake_images,tf.float16)
-            g_predictions = self.discriminator(fake_images)
+            g_predictions = self.discriminator(fake_images, training=True)
             wganLoss = -self.g_loss_fn(fake_image_labels,g_predictions)
             contentLoss = content_loss(fake_images, raw_img_batch)
             contentLoss = tf.cast(contentLoss, tf.float32)
@@ -270,7 +271,7 @@ for i in range(1,epochs+1):
             # every few checkpoints, save model.
         # every few epochs, save a an image
         raw_image = (tf.expand_dims(x_batch[0],0))
-        fake_image = cond_gan.generator(raw_image)[0]
+        fake_image = cond_gan.generator(raw_image, training=False)[0]
         #fake_image = tf.cast(fake_image, tf.float16) # do we need to do this??? Worried about floating point math.
         fake_image = fake_image.numpy().astype(np.uint8)
         raw_image = raw_image[0].numpy().astype(np.uint8)

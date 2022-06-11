@@ -5,7 +5,7 @@
 #
 # CONSTANTS
 seed = 3 # my lucky number!
-batch_size = 4 # unsure what my computer can handle haha
+batch_size = 8 # unsure what my computer can handle haha
 num_channels = 4 # rgba!
 image_size = 400
 # each raw image is 1600x1600. I think each output should be too

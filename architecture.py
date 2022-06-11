@@ -28,24 +28,24 @@ def resnetBlock(filters,input):
     # this will simply do a little convoluting, retaining shape.
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(input)
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    #output = keras.layers.Activation('relu')(output)
-    output = (keras.layers.LeakyReLU())(output)
+    output = keras.layers.Activation('selu')(output)
+    #output = (keras.layers.LeakyReLU())(output)
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(output)
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    #output = keras.layers.Activation('relu')(output)
-    output = (keras.layers.LeakyReLU())(output)
+    output = keras.layers.Activation('selu')(output)
+    #output = (keras.layers.LeakyReLU())(output)
     return keras.layers.Concatenate()([input,output])
 
 # ok that's not working too well. Let's try this:
 def simpleConvBlock(filters,input):
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(input) # 3x3 because these are in a small latent space.
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    #output = keras.layers.Activation('relu')(output)
-    output = (keras.layers.LeakyReLU())(output)
+    output = keras.layers.Activation('selu')(output)
+    #output = (keras.layers.LeakyReLU())(output)
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(output)
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    #output = keras.layers.Activation('relu')(output)
-    output = (keras.layers.LeakyReLU())(output)
+    output = keras.layers.Activation('selu')(output)
+    #output = (keras.layers.LeakyReLU())(output)
     return output
 
 # helper for gen()
@@ -56,8 +56,8 @@ def gen_encoder_block(n,batchnorm=True):
     if batchnorm:
         # optionally batchnormalize
         t.add(keras.layers.BatchNormalization(momentum=0.85))
-    #t.add(keras.layers.Activation('relu'))
-    t.add(keras.layers.LeakyReLU())
+    t.add(keras.layers.Activation('selu'))
+    #t.add(keras.layers.LeakyReLU())
     return t
 
 # helper for gen()
@@ -68,13 +68,13 @@ def gen_decoder_block(n):
     # always do batch normalization
     t.add(keras.layers.BatchNormalization(momentum=0.85))
     # activation:
-    #t.add(keras.layers.Activation('relu'))
-    t.add(keras.layers.LeakyReLU())
+    t.add(keras.layers.Activation('selu'))
+    #t.add(keras.layers.LeakyReLU())
     return t
 
 # decided to make this whole thing residual.
 def gen():
-    input = keras.layers.Input(shape=(image_size,image_size,num_channels),dtype=tf.float16)
+    input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float32)
     scale = keras.layers.Rescaling(1.0/255.0,offset=0)(input) # scale to between 0 and 1
     en1 = gen_encoder_block(8, batchnorm=False)(scale)
     en2 = gen_encoder_block(16)(en1)
@@ -85,11 +85,12 @@ def gen():
     de1 = keras.layers.Dropout(0.25)(keras.layers.Concatenate()([en2,gen_decoder_block(24)(drop)]))
     de2 = keras.layers.Concatenate()([en1,gen_decoder_block(16)(de1)])
     de3 = gen_decoder_block(8)(de2)
-    output = keras.layers.Conv2D(8,(3,3),(1,1),padding='same',activation=None)(de3)
-    output - keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.LeakyReLU()(output)
+    output = keras.layers.Conv2D(8,(3,3),(1,1),padding='same',activation='selu')(de3)
+    output = keras.layers.BatchNormalization(momentum=0.85)(output)
+    output = keras.layers.Conv2D(num_channels,(3,3),(1,1),padding='same',activation='selu')(de3)
+    #output = keras.layers.LeakyReLU()(output)
     #output = keras.layers.Dropout(0.3)(output)
-    output = keras.layers.Add()([keras.layers.Conv2D(num_channels,(1,1),(1,1),padding='same',activation=None)(output),scale]) # finally handle the RGB output
+    output = keras.layers.Add()([output,scale]) # finally handle the RGB output
     #output = keras.layers.Concatenate()([keras.layers.Dense(1)(output), keras.layers.Dense(1)(output), keras.layers.Dense(1)(output)])
     output = keras.layers.ReLU(max_value=1.0)(output) # I don't KNOW if I have to do this, but the output should never be greater than 1???
     output = keras.layers.Rescaling(255.0)(output) # rescale up to 255
@@ -108,29 +109,29 @@ def dis_block(filters,input,batchnorm=True):
     output = keras.layers.Conv2D(filters,(2,2),(2,2),padding='valid', kernel_constraint=const)(input)
     if batchnorm:
         output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.LeakyReLU(alpha=0.2)(output)
-    #output = keras.layers.Activation('relu')(output)
+    #output = keras.layers.LeakyReLU(alpha=0.2)(output)
+    output = keras.layers.Activation('selu')(output)
     return output
 
 # this describes internal convolutions for the discriminator
 def discConvBlock(filters,input):
     output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const)(input) # 3x3 because these are in a small latent space.
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    #output = keras.layers.Activation('relu')(output)
-    output = (keras.layers.LeakyReLU())(output)
-    output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(output)
+    output = keras.layers.Activation('selu')(output)
+    #output = (keras.layers.LeakyReLU())(output)
+    output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const)(output)
     output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    #output = keras.layers.Activation('relu')(output)
-    output = (keras.layers.LeakyReLU())(output)
+    output = keras.layers.Activation('selu')(output)
+    #output = (keras.layers.LeakyReLU())(output)
     return output
 
 def dis():
-    input = keras.layers.Input(shape=(image_size,image_size,num_channels),dtype=tf.float16)
+    input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float32)
     scale = keras.layers.Rescaling(1.0/127.5,offset=-1)(input)
     #out = keras.layers.Lambda(lambda x:hasNan(x,0))(scale)
     out = keras.layers.RandomRotation((-0.3,0.3),seed=seed)(scale)
     out = keras.layers.RandomZoom(0.5,0.5,seed=seed)(out)
-    out = keras.layers.RandomContrast(0.2,seed=seed)(out)
+    #out = keras.layers.RandomContrast(0.2,seed=seed)(out)
     #out = keras.layers.RandomBrightness(0.5, value_range=(-1,1), seed=seed)(out) # doesn't exist?
     #out = keras.layers.RandomCrop(image_size//2, image_size//2, seed=seed)(out) # resizes, not sure if we want that?
     out = keras.layers.RandomFlip(seed=seed)(out)
