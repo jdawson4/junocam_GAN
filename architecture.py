@@ -23,81 +23,6 @@ class ClipConstraint(keras.constraints.Constraint):
 		return {'clip_value': self.clip_value}
 const = ClipConstraint(0.01)
 
-'''
-# probably a resnet would work best for this task, right?
-def resnetBlock(filters,input):
-    # this will simply do a little convoluting, retaining shape.
-    output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(input)
-    output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.Activation('selu')(output)
-    #output = (keras.layers.LeakyReLU())(output)
-    output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(output)
-    output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.Activation('selu')(output)
-    #output = (keras.layers.LeakyReLU())(output)
-    return keras.layers.Concatenate()([input,output])
-
-# ok that's not working too well. Let's try this:
-def simpleConvBlock(filters,input):
-    output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(input) # 3x3 because these are in a small latent space.
-    output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.Activation('selu')(output)
-    #output = (keras.layers.LeakyReLU())(output)
-    output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same')(output)
-    output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.Activation('selu')(output)
-    #output = (keras.layers.LeakyReLU())(output)
-    return output
-
-# helper for gen()
-def gen_encoder_block(n,batchnorm=True):
-    t = keras.Sequential()
-    # downsample:
-    t.add(keras.layers.Conv2D(n, (4,4), strides=(2,2), padding='same'))
-    if batchnorm:
-        # optionally batchnormalize
-        t.add(keras.layers.BatchNormalization(momentum=0.85))
-    t.add(keras.layers.Activation('selu'))
-    #t.add(keras.layers.LeakyReLU())
-    return t
-
-# helper for gen()
-def gen_decoder_block(n):
-    t=keras.Sequential()
-    # upsample:
-    t.add(keras.layers.Conv2DTranspose(n, (4,4), strides=(2,2), padding='same'))
-    # always do batch normalization
-    t.add(keras.layers.BatchNormalization(momentum=0.85))
-    # activation:
-    t.add(keras.layers.Activation('selu'))
-    #t.add(keras.layers.LeakyReLU())
-    return t
-
-# decided to make this whole thing residual.
-def gen():
-    input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float32)
-    scale = keras.layers.Rescaling(1.0/255.0,offset=0)(input) # scale to between 0 and 1
-    en1 = gen_encoder_block(8, batchnorm=False)(scale)
-    en2 = gen_encoder_block(16)(en1)
-    en3 = gen_encoder_block(24)(en2)
-    res1 = simpleConvBlock(64,en3)
-    res2 = simpleConvBlock(64,res1)
-    drop = keras.layers.Dropout(0.25)(res2)
-    de1 = keras.layers.Dropout(0.25)(keras.layers.Concatenate()([en2,gen_decoder_block(24)(drop)]))
-    de2 = keras.layers.Concatenate()([en1,gen_decoder_block(16)(de1)])
-    de3 = gen_decoder_block(8)(de2)
-    output = keras.layers.Conv2D(8,(3,3),(1,1),padding='same',activation='selu')(de3)
-    output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.Conv2D(num_channels,(3,3),(1,1),padding='same',activation='selu')(de3)
-    #output = keras.layers.LeakyReLU()(output)
-    #output = keras.layers.Dropout(0.3)(output)
-    output = keras.layers.Add()([output,scale]) # finally handle the RGB output
-    #output = keras.layers.Concatenate()([keras.layers.Dense(1)(output), keras.layers.Dense(1)(output), keras.layers.Dense(1)(output)])
-    output = keras.layers.ReLU(max_value=1.0)(output) # I don't KNOW if I have to do this, but the output should never be greater than 1???
-    output = keras.layers.Rescaling(255.0)(output) # rescale up to 255
-    return keras.Model(inputs=input, outputs=output,name='generator')
-'''
-
 # ok, the generator clearly isn't doing too hot.
 # Here we go with a new architecture: a densenet generator!
 
@@ -132,8 +57,9 @@ def transitionUpscale(x,filters):
 
 def gen():
     input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float32)
-    scale = keras.layers.Rescaling(1.0/255.0, offset=0)(input)
-    c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same')(scale)
+    #scale = keras.layers.Rescaling(1.0/255.0, offset=0)(input)
+    #c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same')(scale)
+    c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same')(input)
     d1 = denseBlock(c1,8)
     t1 = transitionDownscale(d1,8)
     d2 = denseBlock(t1,16)
@@ -149,10 +75,11 @@ def gen():
     d6 = denseBlock(t5,8)
     t6 = transitionUpscale(d6,8)
     t6 = keras.layers.Concatenate()([t6,d1])
-    c2 = keras.layers.Conv2D(num_channels, kernel_size=(7,7), strides=(1,1), activation='selu',padding='same')(t6)
-    out = keras.layers.Add()([c2, scale])
-    out = keras.layers.ReLU(max_value=1.0)(out)
-    out = keras.layers.Rescaling(255.0)(out)
+    c2 = keras.layers.Conv2D(num_channels, kernel_size=(7,7), strides=(1,1), activation='selu',padding='same')(t6) # essentially the network output--the amount to "add" to the original image
+    #out = keras.layers.Add()([c2, scale])
+    #out = keras.layers.Add()([c2, input])
+    out = keras.layers.ReLU(max_value=255.0)(c2) # ensures that values are in the correct range
+    #out = keras.layers.Rescaling(255.0)(out)
     return keras.Model(inputs=input, outputs=out, name='generator')
 
 def hasNan(x, number):
