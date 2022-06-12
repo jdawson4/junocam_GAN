@@ -115,8 +115,10 @@ print('######################################################################')
 print('\n')
 
 def content_loss(fake, real):
-    ssim = chi * (1-tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0)))
-    l1 = ((1-chi) * tf.norm((fake/(batch_size*255.0)) - (real/(batch_size*255.0))))
+    f=tf.cast(fake, tf.float32)
+    r=tf.cast(real, tf.float32)
+    ssim = chi * (1.0-tf.experimental.numpy.mean(tf.image.ssim(f,r,1.0)))
+    l1 = ((1.0-chi) * tf.norm((f/(batch_size*255.0)) - (r/(batch_size*255.0))))
     return tf.cast(ssim,tf.float32)+tf.cast(l1,tf.float32)
     # apparently this returns semantic dist?
     # note: SSIM measures from 0 to 1. 0 means poor quality, 1 means good
@@ -223,7 +225,7 @@ cond_gan.compile(
 #cond_gan.load_weights("ckpts/ckpt10")
 #print("Checkpoint loaded, skipping training.")
 
-# this is my janky, beautiful, disgusting, manual solution to the fit() problem
+'''# this is my janky, beautiful, disgusting, manual solution to the fit() problem
 # instead of using keras' in-built fit() function, I'm doing each batch
 # manually. However, this does mean that I can be quite specific with how my
 # checkpoints and callbacks work and shit like that, so that's nice.
@@ -276,7 +278,39 @@ for i in range(1,epochs+1):
         fake_image = fake_image.numpy().astype(np.uint8)
         raw_image = raw_image[0].numpy().astype(np.uint8)
         imageio.imwrite('checkpoint_imgs/'+str(i)+'.png', fake_image)
-        imageio.imwrite('checkpoint_imgs/raw'+str(i)+'.png', raw_image)
+        imageio.imwrite('checkpoint_imgs/raw'+str(i)+'.png', raw_image)'''
+
+class Every5Callback(keras.callbacks.Callback):
+    def __init__(self,data,epoch_interval=5):
+        self.data = data
+        self.epoch_interval = epoch_interval
+    def on_epoch_end(self,epoch,logs=None):
+        if ((epoch % self.epoch_interval)==0):
+            random_selection = self.data.take(1)
+            raw_images, _ = list(random_selection.as_numpy_iterator())[0]
+            raw_image = tf.convert_to_tensor(raw_images[0],dtype=tf.float32)
+            fake_image = self.model.generator(tf.expand_dims(raw_image,0),training=False)[0]
+            raw_image = raw_image.numpy().astype(np.uint8)
+            fake_image = fake_image.numpy().astype(np.uint8)
+            imageio.imwrite('checkpoint_imgs/'+str(epoch)+'.png', fake_image)
+            imageio.imwrite('checkpoint_imgs/'+str(epoch)+'raw.png', raw_image)
+
+            self.model.save_weights("ckpts/ckpt"+str(epoch), overwrite=True, save_format='h5')
+            if (epoch%(self.epoch_interval*2))==0:
+                self.model.generator.save('junoGen',overwrite=True)
+                # every few checkpoints, save model.
+
+both_datasets = tf.data.Dataset.zip((raw_imgs,user_imgs))
+cond_gan.fit(
+    both_datasets,
+    # data is already batched!
+    epochs = epochs,
+    verbose=1,
+    callbacks=[Every5Callback(both_datasets)], # custom callbacks here!
+    # validation doesnt really apply here?
+    shuffle=False, # already shuffled by dataset api
+)
+
 cond_gan.save_weights("ckpts/finished", overwrite=True, save_format='h5')
 cond_gan.generator.save('junoGen',overwrite=True)
 # for good measure, save again once we're done training

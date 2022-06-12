@@ -5,7 +5,7 @@
 #
 # CONSTANTS
 seed = 3 # my lucky number!
-batch_size = 8 # unsure what my computer can handle haha
+batch_size = 4 # unsure what my computer can handle haha
 num_channels = 4 # rgba!
 image_size = 400
 # each raw image is 1600x1600. I think each output should be too
@@ -24,6 +24,6 @@ chi = 0 # how much we care about SSIM vs L2 when creating content loss
 # ^ not sure if we're even going to use L2 after all.
 
 # learning rates:
-gen_learn_rate = 0.000001
-dis_learn_rate = 0.000001
+gen_learn_rate = 0.00001
+dis_learn_rate = 0.00001
 momentum = 0.5

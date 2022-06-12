@@ -23,6 +23,7 @@ class ClipConstraint(keras.constraints.Constraint):
 		return {'clip_value': self.clip_value}
 const = ClipConstraint(0.01)
 
+'''
 # probably a resnet would work best for this task, right?
 def resnetBlock(filters,input):
     # this will simply do a little convoluting, retaining shape.
@@ -95,6 +96,64 @@ def gen():
     output = keras.layers.ReLU(max_value=1.0)(output) # I don't KNOW if I have to do this, but the output should never be greater than 1???
     output = keras.layers.Rescaling(255.0)(output) # rescale up to 255
     return keras.Model(inputs=input, outputs=output,name='generator')
+'''
+
+# ok, the generator clearly isn't doing too hot.
+# Here we go with a new architecture: a densenet generator!
+
+# first component: the Batchnormalize, Activation,
+# Convolution combo-punch
+def bac(x,filters):
+    b = keras.layers.BatchNormalization(momentum=0.85)(x)
+    b = keras.layers.Activation('selu')(b)
+    b = keras.layers.Conv2D(filters, kernel_size=(3,3), padding='same')(b)
+    return b
+
+# the DenseBlock then uses that above combination to create a
+# very dense thingie that outputs a good bit of data.
+def denseBlock(x,filters):
+    l1 = bac(x,filters)
+    l2 = bac(l1,filters)
+    l3 = bac(keras.layers.Concatenate()([l1,l2]),filters)
+    l4 = bac(keras.layers.Concatenate()([l1,l2,l3]),filters)
+    l5 = bac(keras.layers.Concatenate()([l1,l2,l3,l4]),filters)
+    # do we pool? I don't think so--that's only in the transition layers
+    return l5
+
+def transitionDownscale(x,filters):
+    conv = keras.layers.Conv2D(filters,kernel_size=(1,1),strides=(1,1),activation='selu',padding='same')(x)
+    avp = keras.layers.AveragePooling2D((2,2),strides=2)(conv)
+    return avp
+
+def transitionUpscale(x,filters):
+    conv = keras.layers.Conv2D(filters,kernel_size=(1,1),strides=(1,1),activation='selu',padding='same')(x)
+    ups = keras.layers.UpSampling2D(size=(2,2), interpolation='bilinear')(conv)
+    return ups
+
+def gen():
+    input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float32)
+    scale = keras.layers.Rescaling(1.0/255.0, offset=0)(input)
+    c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same')(scale)
+    d1 = denseBlock(c1,8)
+    t1 = transitionDownscale(d1,8)
+    d2 = denseBlock(t1,16)
+    t2 = transitionDownscale(d2,16)
+    d3 = denseBlock(t2,32)
+    t3 = transitionDownscale(d3,32)
+    d4 = denseBlock(t3,64)
+    t4 = transitionUpscale(d4,32)
+    t4 = keras.layers.Concatenate()([t4,d3])
+    d5 = denseBlock(t4,16)
+    t5 = transitionUpscale(d5,16)
+    t5 = keras.layers.Concatenate()([t5, d2])
+    d6 = denseBlock(t5,8)
+    t6 = transitionUpscale(d6,8)
+    t6 = keras.layers.Concatenate()([t6,d1])
+    c2 = keras.layers.Conv2D(num_channels, kernel_size=(7,7), strides=(1,1), activation='selu',padding='same')(t6)
+    out = keras.layers.Add()([c2, scale])
+    out = keras.layers.ReLU(max_value=1.0)(out)
+    out = keras.layers.Rescaling(255.0)(out)
+    return keras.Model(inputs=input, outputs=out, name='generator')
 
 def hasNan(x, number):
     # I'm sick of getting this error. What if our network warns us when there's
