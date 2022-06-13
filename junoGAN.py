@@ -67,6 +67,7 @@ raw_imgs = keras.utils.image_dataset_from_directory(
     batch_size = batch_size,
     image_size = (image_size, image_size),
     shuffle=True,
+    interpolation='bilinear',
     seed = seed
 )
 user_imgs = keras.utils.image_dataset_from_directory(
@@ -76,9 +77,20 @@ user_imgs = keras.utils.image_dataset_from_directory(
     batch_size = batch_size,
     image_size = (image_size, image_size), # force everything to be this size?
     shuffle=True,
+    interpolation='bilinear',
     crop_to_aspect_ratio = True, # unsure about this one
     seed = seed
 )
+
+style_image = tf.keras.preprocessing.image.load_img(
+    'style_image.png',
+    color_mode = 'rgba',
+    target_size = (image_size,image_size),
+    interpolation='bilinear'
+)
+style_image = tf.keras.utils.img_to_array(style_image)
+# we will use this example image to compute style loss.
+# Yes, I have been reduced to this.
 
 # maybe we should do image augmentation? Come back to this!
 # TODO: CONSIDER IMAGE AUGMENTATION
@@ -93,16 +105,18 @@ print('\n')
 print('######################################################################')
 print('\n')
 print('Architecture:\n')
-discriminator.summary()
+#discriminator.summary()
 print('\n')
-generator.summary()
+#generator.summary()
 print('\n')
 print("Image size:", image_size)
 print("Approx. raw imgs dataset size:", batch_size * raw_imgs.cardinality().numpy())
 print("Approx. user imgs dataset size:", batch_size * user_imgs.cardinality().numpy())
 print("Batch size:", batch_size)
 #print("Latent dim used by generator is 1/"+str(latent_dim_smaller_by_factor), "of input")
-print("Value of hyperparameter psi:", psi)
+print("Weight of content loss:", content_lambda)
+print("Weight of WGAN loss:", wgan_lambda)
+print("Weight of style loss:", style_lambda)
 print("Value of hyperparameter chi:", chi)
 print("Value of WGAN hyperparameter n_critic:", n_critic)
 print('g learning rate', gen_learn_rate)
@@ -120,15 +134,26 @@ def content_loss(fake, real):
     ssim = chi * (1.0-tf.experimental.numpy.mean(tf.image.ssim(f,r,1.0)))
     l1 = ((1.0-chi) * tf.norm((f/(batch_size*255.0)) - (r/(batch_size*255.0))))
     return tf.cast(ssim,tf.float32)+tf.cast(l1,tf.float32)
-    # apparently this returns semantic dist?
-    # note: SSIM measures from 0 to 1. 0 means poor quality, 1 means good
-    # quality. We want loss to be 1-ssim, so that we encourage good quality,#
-    # right? Yes. That's what others are doing, so I'll copy them.
-    # This SHOULD fix an issue where it seems like the generator was coming
-    # up with images that where spherical (and able to trick the discriminator)
-    # but still fucked up (colors looked WEIRD.)
-    # Others still are using SSIM + L2, which... I sorta like! I'll consider it.
-    #return (1.0-(tf.experimental.numpy.mean(tf.image.ssim(fake,real,1.0))))
+
+def gram_matrix(x):
+    #x = tf.expand_dims(x, 0)
+    #print(x.shape)
+    x = tf.cast(tf.transpose(x, (2, 0, 1)), tf.float32)
+    features = tf.reshape(x, (tf.shape(x)[0], -1))
+    gram = tf.matmul(features, tf.transpose(features))
+    #print('gram:',gram)
+    return tf.cast(gram, tf.float32)
+
+def style_loss(fake, style):
+    S = gram_matrix(style)
+    sum = tf.cast(0.0, tf.float32)
+    for f in fake:
+        C = gram_matrix(f)
+        size = tf.cast(image_size * image_size, tf.float32)
+        sum += tf.math.reduce_sum(tf.math.square(S-C)) / (4.0 * (num_channels ** 2) * (size ** 2))
+    #print('style_loss:',sum / batch_size)
+    return sum / batch_size
+
 # and here we create teh ConditionalGAN itself. Exciting!
 class ConditionalGAN(keras.Model):
     def __init__(self,discriminator, generator):
@@ -188,9 +213,14 @@ class ConditionalGAN(keras.Model):
             contentLoss = content_loss(fake_images, raw_img_batch)
             contentLoss = tf.cast(contentLoss, tf.float32)
             wganLoss = tf.cast(wganLoss, tf.float32)
-            wganLoss = tf.convert_to_tensor(1.0-psi, dtype=tf.float32) * wganLoss
-            contentLoss = tf.convert_to_tensor(psi, dtype=tf.float32) * contentLoss
-            total_g_loss = (wganLoss + contentLoss)
+            styleLoss = style_loss(fake_images,style_image)
+            wganLoss = tf.convert_to_tensor(wgan_lambda, dtype=tf.float32) * wganLoss
+            contentLoss = tf.convert_to_tensor(content_lambda, dtype=tf.float32) * contentLoss
+            styleLoss = tf.convert_to_tensor(style_lambda, dtype=tf.float32) * styleLoss
+            total_g_loss = (wganLoss + contentLoss + styleLoss)
+        #print(wganLoss)
+        #print(styleLoss)
+        #print(contentLoss)
         grads = gtape.gradient(total_g_loss, self.generator.trainable_weights)
         self.g_optimizer.apply_gradients(
             zip(grads,self.generator.trainable_weights)
@@ -201,7 +231,8 @@ class ConditionalGAN(keras.Model):
             'g_loss': self.gen_loss_tracker.result(),
             'd_loss': self.dis_loss_tracker.result(),
             'GAN_loss': wganLoss,
-            'content_loss': contentLoss
+            'content_loss': contentLoss,
+            'style_loss': styleLoss
         }
 
 # okay... let's try to use this thing:
@@ -213,8 +244,10 @@ def wasserstein_loss(y_true,y_pred):
     #print(tf.keras.backend.mean(y_true*y_pred))
     return tf.keras.backend.mean(y_true*y_pred)
 cond_gan.compile(
-    d_optimizer = tf.keras.optimizers.RMSprop(learning_rate = dis_learn_rate),
-    g_optimizer = tf.keras.optimizers.RMSprop(learning_rate = gen_learn_rate),
+    #d_optimizer = tf.keras.optimizers.RMSprop(learning_rate = dis_learn_rate),
+    #g_optimizer = tf.keras.optimizers.RMSprop(learning_rate = gen_learn_rate),
+    d_optimizer = tf.keras.optimizers.Adam(learning_rate = dis_learn_rate,beta_1=momentum),
+    g_optimizer = tf.keras.optimizers.Adam(learning_rate = gen_learn_rate,beta_1=momentum),
     d_loss_fn = wasserstein_loss,
     g_loss_fn = wasserstein_loss,
     run_eagerly=True

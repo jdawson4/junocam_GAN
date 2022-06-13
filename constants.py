@@ -14,14 +14,12 @@ epochs = 300
 n_critic = 1 # the number of times we'll train the discriminator before going on to the generator
 # ^ the original paper chose 5
 
-# custom hyperparameters
-psi = 0.1 # REALLY small because otherwise it swamps GAN loss
-# ^ determines how much weight we give to "content loss" vs the
-# "fooling the discriminator" loss in our generative loss function.
-# 1 means that we only care about content loss; 0 means that we only
-# care about fooling the discriminator
+# custom hyperparameters--determine things about loss:
 chi = 0 # how much we care about SSIM vs L2 when creating content loss
 # ^ not sure if we're even going to use L2 after all.
+content_lambda = 0.1 # content loss weight
+wgan_lambda = 0.8 # the weight we give to fooling the wgan
+style_lambda = 0.00005 # the weight we give to style loss
 
 # learning rates:
 gen_learn_rate = 0.01
