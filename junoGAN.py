@@ -204,6 +204,9 @@ class ConditionalGAN(keras.Model):
                 zip(grads, self.discriminator.trainable_weights)
             )
             self.dis_loss_tracker.update_state(d_loss)
+        littleDiscrim = keras.Model(inputs = self.discriminator.input,
+            outputs = self.discriminator.get_layer('conv2d_40').output
+        )
 
         with tf.GradientTape() as gtape:
             fake_images = self.generator(raw_img_batch, training=True)
@@ -213,7 +216,9 @@ class ConditionalGAN(keras.Model):
             contentLoss = content_loss(fake_images, raw_img_batch)
             contentLoss = tf.cast(contentLoss, tf.float32)
             wganLoss = tf.cast(wganLoss, tf.float32)
-            styleLoss = style_loss(fake_images,style_image)
+            style_analysis = littleDiscrim(tf.expand_dims(style_image,0))[0]
+            fake_analysis = littleDiscrim(fake_images)
+            styleLoss = style_loss(fake_analysis,style_analysis)
             wganLoss = tf.convert_to_tensor(wgan_lambda, dtype=tf.float32) * wganLoss
             contentLoss = tf.convert_to_tensor(content_lambda, dtype=tf.float32) * contentLoss
             styleLoss = tf.convert_to_tensor(style_lambda, dtype=tf.float32) * styleLoss
