@@ -19,7 +19,7 @@ chi = 0 # how much we care about SSIM vs L2 when creating content loss
 # ^ not sure if we're even going to use L2 after all.
 content_lambda = 0.1 # content loss weight
 wgan_lambda = 0.8 # the weight we give to fooling the wgan
-style_lambda = 1e+16 # the weight we give to style loss
+style_lambda = 1e+12 # the weight we give to style loss
 
 # learning rates:
 gen_learn_rate = 0.01

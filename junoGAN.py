@@ -205,7 +205,7 @@ class ConditionalGAN(keras.Model):
             )
             self.dis_loss_tracker.update_state(d_loss)
         littleDiscrim = keras.Model(inputs = self.discriminator.input,
-            outputs = self.discriminator.get_layer('conv2d_40').output
+            outputs = self.discriminator.get_layer('conv2d_39').output
         )
 
         with tf.GradientTape() as gtape:
