@@ -233,11 +233,17 @@ class ConditionalGAN(keras.Model):
         )
         self.gen_loss_tracker.update_state(total_g_loss)
 
-        #print("")
-        #print(tf.reduce_max(fake_images))
-        #print(tf.reduce_max((raw_img_batch)))
-        #print(tf.reduce_max((user_img_batch)))
-        #print("")
+        '''
+        print("\nmaxes:")
+        print(tf.reduce_max(fake_images))
+        print(tf.reduce_max((raw_img_batch)))
+        print(tf.reduce_max((user_img_batch)))
+        print("mins:")
+        print(tf.reduce_min(fake_images))
+        print(tf.reduce_min((raw_img_batch)))
+        print(tf.reduce_min((user_img_batch)))
+        print("")
+        '''
 
         return {
             'g_loss': self.gen_loss_tracker.result(),
@@ -267,7 +273,7 @@ cond_gan.compile(
 
 # only uncomment this code if you have a prepared checkpoint to use for output:
 #cond_gan.built=True
-#cond_gan.load_weights("ckpts/ckpt10")
+#cond_gan.load_weights("ckpts/ckpt35")
 #print("Checkpoint loaded, skipping training.")
 
 '''# this is my janky, beautiful, disgusting, manual solution to the fit() problem

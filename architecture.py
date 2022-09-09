@@ -75,9 +75,10 @@ def gen():
     d6 = denseBlock(t5,8)
     t6 = transitionUpscale(d6,8)
     t6 = keras.layers.Concatenate()([t6,d1])
-    c2 = keras.layers.Conv2D(num_channels, kernel_size=(1,1), strides=(1,1), activation='selu',padding='same')(t6) # essentially the network output--the amount to "add" to the original image
+    c2 = keras.layers.Conv2D(num_channels, kernel_size=(1,1), strides=(1,1), activation=None,padding='same')(t6) # essentially the network output--the amount to "add" to the original image
     #out = keras.layers.Add()([c2, scale])
     out = keras.layers.Add()([c2, input])
+    out = keras.layers.Lambda(lambda x: tf.clip_by_value(x, 0.0, 255.0))(out)
     #out = keras.layers.Rescaling(255.0)(out)
     return keras.Model(inputs=input, outputs=out, name='generator')
 
