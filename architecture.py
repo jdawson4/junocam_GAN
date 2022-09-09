@@ -78,7 +78,6 @@ def gen():
     c2 = keras.layers.Conv2D(num_channels, kernel_size=(1,1), strides=(1,1), activation='selu',padding='same')(t6) # essentially the network output--the amount to "add" to the original image
     #out = keras.layers.Add()([c2, scale])
     out = keras.layers.Add()([c2, input])
-    out = keras.layers.ReLU(max_value=255.0)(c2) # ensures that values are in the correct range
     #out = keras.layers.Rescaling(255.0)(out)
     return keras.Model(inputs=input, outputs=out, name='generator')
 

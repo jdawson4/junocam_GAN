@@ -63,7 +63,7 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 raw_imgs = keras.utils.image_dataset_from_directory(
     "raw_imgs/",
     labels = None,
-    color_mode = 'rgba',
+    color_mode = 'rgb',
     batch_size = batch_size,
     image_size = (image_size, image_size),
     shuffle=True,
@@ -73,7 +73,7 @@ raw_imgs = keras.utils.image_dataset_from_directory(
 user_imgs = keras.utils.image_dataset_from_directory(
     "user_imgs/",
     labels = None,
-    color_mode = 'rgba',
+    color_mode = 'rgb',
     batch_size = batch_size,
     image_size = (image_size, image_size), # force everything to be this size?
     shuffle=True,
@@ -84,7 +84,7 @@ user_imgs = keras.utils.image_dataset_from_directory(
 
 style_image = tf.keras.preprocessing.image.load_img(
     'style_image.png',
-    color_mode = 'rgba',
+    color_mode = 'rgb',
     target_size = (image_size,image_size),
     interpolation='bilinear'
 )
@@ -204,9 +204,9 @@ class ConditionalGAN(keras.Model):
                 zip(grads, self.discriminator.trainable_weights)
             )
             self.dis_loss_tracker.update_state(d_loss)
-        littleDiscrim = keras.Model(inputs = self.discriminator.input,
-            outputs = self.discriminator.get_layer('conv2d_39').output
-        )
+        #littleDiscrim = keras.Model(inputs = self.discriminator.input,
+        #    outputs = self.discriminator.get_layer('conv2d_39').output
+        #)
 
         with tf.GradientTape() as gtape:
             fake_images = self.generator(raw_img_batch, training=True)
@@ -216,9 +216,10 @@ class ConditionalGAN(keras.Model):
             contentLoss = content_loss(fake_images, raw_img_batch)
             contentLoss = tf.cast(contentLoss, tf.float32)
             wganLoss = tf.cast(wganLoss, tf.float32)
-            style_analysis = littleDiscrim(tf.expand_dims(style_image,0))[0]
-            fake_analysis = littleDiscrim(fake_images)
-            styleLoss = style_loss(fake_analysis,style_analysis)
+            #style_analysis = littleDiscrim(tf.expand_dims(style_image,0))[0]
+            #fake_analysis = littleDiscrim(fake_images)
+            #styleLoss = style_loss(fake_analysis,style_analysis)
+            styleLoss = 0.0
             wganLoss = tf.convert_to_tensor(wgan_lambda, dtype=tf.float32) * wganLoss
             contentLoss = tf.convert_to_tensor(content_lambda, dtype=tf.float32) * contentLoss
             styleLoss = tf.convert_to_tensor(style_lambda, dtype=tf.float32) * styleLoss
@@ -231,6 +232,12 @@ class ConditionalGAN(keras.Model):
             zip(grads,self.generator.trainable_weights)
         )
         self.gen_loss_tracker.update_state(total_g_loss)
+
+        #print("")
+        #print(tf.reduce_max(fake_images))
+        #print(tf.reduce_max((raw_img_batch)))
+        #print(tf.reduce_max((user_img_batch)))
+        #print("")
 
         return {
             'g_loss': self.gen_loss_tracker.result(),
@@ -318,7 +325,7 @@ for i in range(1,epochs+1):
         imageio.imwrite('checkpoint_imgs/'+str(i)+'.png', fake_image)
         imageio.imwrite('checkpoint_imgs/raw'+str(i)+'.png', raw_image)'''
 
-class Every5Callback(keras.callbacks.Callback):
+class EveryKCallback(keras.callbacks.Callback):
     def __init__(self,data,epoch_interval=5):
         self.data = data
         self.epoch_interval = epoch_interval
@@ -344,7 +351,7 @@ cond_gan.fit(
     # data is already batched!
     epochs = epochs,
     verbose=1,
-    callbacks=[Every5Callback(both_datasets)], # custom callbacks here!
+    callbacks=[EveryKCallback(both_datasets, epoch_interval=5)], # custom callbacks here!
     # validation doesnt really apply here?
     shuffle=False, # already shuffled by dataset api
 )

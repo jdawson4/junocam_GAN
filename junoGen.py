@@ -9,7 +9,7 @@ from constants import *
 raw_imgs = tf.keras.preprocessing.image_dataset_from_directory(
     "raw_imgs/",
     labels = None,
-    color_mode = 'rgba',
+    color_mode = 'rgb',
     batch_size = 1,
     image_size = (image_size, image_size),
     shuffle=True,
