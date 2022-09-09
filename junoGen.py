@@ -28,3 +28,4 @@ for b in raw_imgs.__iter__():
         # sorta weird to loop like this but keras outputs a list of length 1,
         # so just go with it
         imageio.imwrite('fake_images/'+str(i)+'.png', fake_image)
+        

@@ -68,3 +68,4 @@ for i in range(13190, 0, -1): # this will save every 50th image.
 		img.save('user_imgs/'+str(i)+'.png')
 	print("Finished with", i)
 	#print('\n\n')
+	
