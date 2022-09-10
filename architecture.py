@@ -57,9 +57,9 @@ def transitionUpscale(x,filters):
 
 def gen():
     input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float32)
-    #scale = keras.layers.Rescaling(1.0/255.0, offset=0)(input)
+    scale = keras.layers.Rescaling(1.0/255.0, offset=0)(input)
     #c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same')(scale)
-    c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same')(input)
+    c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same')(scale)
     d1 = denseBlock(c1,8)
     t1 = transitionDownscale(d1,8)
     d2 = denseBlock(t1,16)
@@ -75,11 +75,12 @@ def gen():
     d6 = denseBlock(t5,8)
     t6 = transitionUpscale(d6,8)
     t6 = keras.layers.Concatenate()([t6,d1])
-    c2 = keras.layers.Conv2D(num_channels, kernel_size=(1,1), strides=(1,1), activation=None,padding='same')(t6) # essentially the network output--the amount to "add" to the original image
-    #out = keras.layers.Add()([c2, scale])
-    out = keras.layers.Add()([c2, input])
+    c2 = keras.layers.Conv2D(num_channels, kernel_size=(3,3), strides=(1,1), activation='selu',padding='same')(t6) # essentially the network output--the amount to "add" to the original image
+    c3 = keras.layers.Conv2D(num_channels, kernel_size=(5,5), strides=(1,1), activation='selu',padding='same')(c2)
+    out = keras.layers.Conv2D(num_channels, kernel_size=(1,1), strides=(1,1), activation='selu',padding='same')(c3)
+    out = keras.layers.Add()([out, scale])
+    out = keras.layers.Rescaling(255.0)(out)
     out = keras.layers.Lambda(lambda x: tf.clip_by_value(x, 0.0, 255.0))(out)
-    #out = keras.layers.Rescaling(255.0)(out)
     return keras.Model(inputs=input, outputs=out, name='generator')
 
 def hasNan(x, number):

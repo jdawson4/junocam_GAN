@@ -335,7 +335,7 @@ class EveryKCallback(keras.callbacks.Callback):
     def __init__(self,data,epoch_interval=5):
         self.data = data
         self.epoch_interval = epoch_interval
-    def on_epoch_end(self,epoch,logs=None):
+    def on_epoch_begin(self,epoch,logs=None):
         if ((epoch % self.epoch_interval)==0):
             random_selection = self.data.take(1)
             raw_images, _ = list(random_selection.as_numpy_iterator())[0]
@@ -357,7 +357,7 @@ cond_gan.fit(
     # data is already batched!
     epochs = epochs,
     verbose=1,
-    callbacks=[EveryKCallback(both_datasets, epoch_interval=5)], # custom callbacks here!
+    callbacks=[EveryKCallback(both_datasets, epoch_interval=2)], # custom callbacks here!
     # validation doesnt really apply here?
     shuffle=False, # already shuffled by dataset api
 )
