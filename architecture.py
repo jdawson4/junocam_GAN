@@ -57,7 +57,7 @@ def transitionUpscale(x,filters):
     return ups
 
 def gen():
-    input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float32)
+    input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/255.0, offset=0)(input)
     #c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same', kernel_initializer=initializer)(scale)
     c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same', kernel_initializer=initializer)(scale)
@@ -114,7 +114,7 @@ def discConvBlock(filters,input):
     return output
 
 def dis():
-    input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float32)
+    input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/127.5,offset=-1)(input)
     out = keras.layers.RandomRotation((-0.3,0.3),seed=seed)(scale)
     out = keras.layers.RandomZoom(0.5,0.5,seed=seed)(out)
@@ -126,11 +126,11 @@ def dis():
     out = dis_block(8,out)
     out = keras.layers.Dropout(0.2)(out)
     out = dis_block(16,out)
-    out = dis_block(16,out)
+    #out = dis_block(16,out)
     out = dis_block(24,out)
     out = discConvBlock(24, out)
-    out = discConvBlock(32, out)
-    out = discConvBlock(32, out)
+    #out = discConvBlock(32, out)
+    #out = discConvBlock(32, out)
     #out = discConvBlock(32, out)
     out = keras.layers.Flatten()(out)
     out = keras.layers.Dense(1, kernel_constraint=const)(out)

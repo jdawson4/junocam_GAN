@@ -58,6 +58,8 @@ if len(physical_devices) > 0:
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
+keras.mixed_precision.set_global_policy('mixed_float16')
+
 # The data on my computer is nearly 600 MB...
 # I'm not sure if this is a great idea:
 raw_imgs = keras.utils.image_dataset_from_directory(
@@ -91,9 +93,6 @@ style_image = tf.keras.preprocessing.image.load_img(
 style_image = tf.keras.utils.img_to_array(style_image)
 # we will use this example image to compute style loss.
 # Yes, I have been reduced to this.
-
-# maybe we should do image augmentation? Come back to this!
-# TODO: CONSIDER IMAGE AUGMENTATION
 
 # these are declared in architecture.py
 generator = gen()
@@ -196,8 +195,8 @@ class ConditionalGAN(keras.Model):
         fake_images = tf.cast(fake_images,tf.float16)
         for itr in range(n_critic):
             with tf.GradientTape() as dtape:
-                g_predictions = self.discriminator(fake_images, training=True)
-                d_predictions = self.discriminator(user_img_batch, training=True)
+                g_predictions = tf.cast(self.discriminator(fake_images, training=True), tf.float32)
+                d_predictions = tf.cast(self.discriminator(user_img_batch, training=True), tf.float32)
                 d_loss = self.d_loss_fn(fake_image_labels,g_predictions) - self.d_loss_fn(true_image_labels,d_predictions)
             grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(
@@ -211,7 +210,7 @@ class ConditionalGAN(keras.Model):
         with tf.GradientTape() as gtape:
             fake_images = self.generator(raw_img_batch, training=True)
             fake_images = tf.cast(fake_images,tf.float16)
-            g_predictions = self.discriminator(fake_images, training=True)
+            g_predictions = tf.cast(self.discriminator(fake_images, training=True), tf.float32)
             wganLoss = -self.g_loss_fn(fake_image_labels,g_predictions)
             contentLoss = content_loss(fake_images, raw_img_batch)
             contentLoss = tf.cast(contentLoss, tf.float32)
@@ -354,7 +353,7 @@ cond_gan.fit(
     # data is already batched!
     epochs = epochs,
     verbose=1,
-    callbacks=[EveryKCallback(both_datasets, epoch_interval=1)], # custom callbacks here!
+    callbacks=[EveryKCallback(both_datasets, epoch_interval=2)], # custom callbacks here!
     # validation doesnt really apply here?
     shuffle=False, # already shuffled by dataset api
 )
