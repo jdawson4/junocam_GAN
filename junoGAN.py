@@ -224,9 +224,6 @@ class ConditionalGAN(keras.Model):
             contentLoss = tf.convert_to_tensor(content_lambda, dtype=tf.float32) * contentLoss
             styleLoss = tf.convert_to_tensor(style_lambda, dtype=tf.float32) * styleLoss
             total_g_loss = (wganLoss + contentLoss + styleLoss)
-        #print(wganLoss)
-        #print(styleLoss)
-        #print(contentLoss)
         grads = gtape.gradient(total_g_loss, self.generator.trainable_weights)
         self.g_optimizer.apply_gradients(
             zip(grads,self.generator.trainable_weights)
@@ -357,7 +354,7 @@ cond_gan.fit(
     # data is already batched!
     epochs = epochs,
     verbose=1,
-    callbacks=[EveryKCallback(both_datasets, epoch_interval=2)], # custom callbacks here!
+    callbacks=[EveryKCallback(both_datasets, epoch_interval=1)], # custom callbacks here!
     # validation doesnt really apply here?
     shuffle=False, # already shuffled by dataset api
 )

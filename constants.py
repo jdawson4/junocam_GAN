@@ -7,7 +7,7 @@
 seed = 3 # my lucky number!
 batch_size = 4 # unsure what my computer can handle haha
 num_channels = 3 # rgb!
-image_size = 200
+image_size = 400
 # each raw image is 1600x1600. I think each output should be too
 epochs = 100
 #num_filters = 8 # this no longer filters into architecture--it's all based around num_channels now.
@@ -15,10 +15,10 @@ n_critic = 1 # the number of times we'll train the discriminator before going on
 # ^ the original paper chose 5
 
 # custom hyperparameters--determine things about loss:
-chi = 0 # how much we care about SSIM vs L2 when creating content loss
+chi = 0.9 # how much we care about SSIM vs L2 when creating content loss
 # ^ not sure if we're even going to use L2 after all.
-content_lambda = 0.0 # content loss weight
-wgan_lambda = 1.0 # the weight we give to fooling the wgan
+content_lambda = 0.001 # content loss weight
+wgan_lambda = 0.5 # the weight we give to fooling the wgan
 style_lambda = 0.0 # the weight we give to style loss
 
 # learning rates:
