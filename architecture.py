@@ -57,7 +57,7 @@ def transitionUpscale(x,filters):
     return ups
 
 def gen():
-    input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float16)
+    input = keras.layers.Input(shape=(None,None,num_channels), dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/255.0, offset=0)(input)
     #c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same', kernel_initializer=initializer)(scale)
     c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same', kernel_initializer=initializer)(scale)
@@ -113,8 +113,32 @@ def discConvBlock(filters,input):
     output = keras.layers.Activation('selu')(output)
     return output
 
+# maybe not going to be used after all!
+'''def dense_block(filters,input):
+    output = keras.layers.BatchNormalization(momentum=0.85)(input)
+    c1 = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const, activation='selu')(output)
+    c2 = keras.layers.BatchNormalization(momentum=0.85)(c1)
+    c2 = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const, activation='selu')(c2)
+    c3 = keras.layers.Concatenate()([c1, c2])
+    c3 = keras.layers.BatchNormalization(momentum=0.85)(c3)
+    c3 = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const, activation='selu')(c3)
+    c4 = keras.layers.Concatenate()([c1, c2, c3])
+    c4 = keras.layers.BatchNormalization(momentum=0.85)(c4)
+    c4 = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const, activation='selu')(c4)
+    c5 = keras.layers.Concatenate()([c1, c2, c3, c4])
+    c5 = keras.layers.BatchNormalization(momentum=0.85)(c5)
+    c5 = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const, activation='selu')(c5)
+    output = keras.layers.Concatenate()([c1, c2, c3, c4, c5])
+    return output
+
+def transitionLayer(filters, input):
+    output = keras.layers.BatchNormalization(momentum=0.85)(input)
+    output = keras.layers.Conv2D(filters,(1,1),(1,1),padding='same', kernel_constraint=const, activation='selu')(output)
+    output = keras.layers.AveragePooling2D(pool_size=4, strides=4)(output)
+    return output'''
+
 def dis():
-    input = keras.layers.Input(shape=(image_size,image_size,num_channels), dtype=tf.float16)
+    input = keras.layers.Input(shape=(None,None,num_channels), dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/127.5,offset=-1)(input)
     out = keras.layers.RandomRotation((-0.3,0.3),seed=seed)(scale)
     out = keras.layers.RandomZoom(0.5,0.5,seed=seed)(out)
@@ -127,12 +151,15 @@ def dis():
     out = keras.layers.Dropout(0.2)(out)
     out = dis_block(16,out)
     #out = dis_block(16,out)
-    out = dis_block(24,out)
-    out = discConvBlock(24, out)
+    out = dis_block(32,out)
+    out = dis_block(64,out)
+    out = dis_block(128,out)
+    out = discConvBlock(128, out)
     #out = discConvBlock(32, out)
     #out = discConvBlock(32, out)
     #out = discConvBlock(32, out)
-    out = keras.layers.Flatten()(out)
+    #out = keras.layers.Flatten()(out)
+    out = keras.layers.GlobalAveragePooling2D()(out)
     out = keras.layers.Dense(1, kernel_constraint=const)(out)
     return keras.Model(inputs=input,outputs=out,name='discriminator')
 
