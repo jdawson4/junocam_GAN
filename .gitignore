@@ -3,6 +3,8 @@
 raw_imgs/
 user_imgs/
 fake_images/
+cookiecut_raw_imgs/
+cookiecut_user_imgs/
 ckpts/
 # we do not need pycache:
 __pycache__/

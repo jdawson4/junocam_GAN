@@ -63,7 +63,7 @@ keras.mixed_precision.set_global_policy('mixed_float16')
 # The data on my computer is nearly 600 MB...
 # I'm not sure if this is a great idea:
 raw_imgs = keras.utils.image_dataset_from_directory(
-    "raw_imgs/",
+    "cookiecut_raw_imgs/",
     labels = None,
     color_mode = 'rgb',
     batch_size = batch_size,
@@ -73,7 +73,7 @@ raw_imgs = keras.utils.image_dataset_from_directory(
     seed = seed
 )
 user_imgs = keras.utils.image_dataset_from_directory(
-    "user_imgs/",
+    "cookiecut_user_imgs/",
     labels = None,
     color_mode = 'rgb',
     batch_size = batch_size,
