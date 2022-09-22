@@ -106,6 +106,8 @@ cookiecut_user_imgs = keras.utils.image_dataset_from_directory(
 # and combine the cookiecut images with the cropped/zoomed ones:
 raw_imgs = raw_imgs.concatenate(cookiecut_raw_imgs)
 user_imgs = user_imgs.concatenate(cookiecut_user_imgs)
+raw_imgs = raw_imgs.shuffle(100, seed=seed)
+user_imgs = user_imgs.shuffle(100, seed=seed)
 
 style_image = tf.keras.preprocessing.image.load_img(
     'style_image.png',

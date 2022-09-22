@@ -29,7 +29,7 @@ def makeImg(x):
 print(makeImg(a))
     
 '''
-"""
+'''
 raw_imgs = keras.utils.image_dataset_from_directory(
     "raw_imgs/",
     labels = None,
@@ -53,11 +53,11 @@ cookiecut_raw_imgs = keras.utils.image_dataset_from_directory(
 # and combine the cookiecut images with the cropped/zoomed ones:
 raw_imgs = raw_imgs.concatenate(cookiecut_raw_imgs)
 
-raw_imgs.shuffle(100, seed=seed)
+raw_imgs = raw_imgs.shuffle(100, seed=seed)
 
 for i in range(10):
     random_selection = raw_imgs.take(1)
     raw_images = list(random_selection.as_numpy_iterator())[0]
     raw_image = tf.convert_to_tensor(raw_images[0],dtype=tf.float32)
     raw_image = raw_image.numpy().astype(np.uint8)
-    imageio.imwrite('checkpoint_imgs/'+str(i)+'.png', raw_image)"""
+    imageio.imwrite('checkpoint_imgs/'+str(i)+'.png', raw_image)''''''
