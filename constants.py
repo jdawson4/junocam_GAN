@@ -16,7 +16,7 @@ n_critic = 1 # the number of times we'll train the discriminator before going on
 chi = 0.9 # how much we care about SSIM vs L2 when creating content loss
 # ^ not sure if we're even going to use L2 after all.
 content_lambda = 0.001 # content loss weight
-wgan_lambda = 0.5 # the weight we give to fooling the wgan
+wgan_lambda = 1.0 # the weight we give to fooling the wgan
 style_lambda = 0.0 # the weight we give to style loss
 
 # learning rates: a few different strategies:

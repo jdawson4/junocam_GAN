@@ -59,30 +59,53 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 keras.mixed_precision.set_global_policy('mixed_float16')
+tf.random.set_seed(seed)
 
-# The data on my computer is nearly 600 MB...
-# I'm not sure if this is a great idea:
 raw_imgs = keras.utils.image_dataset_from_directory(
+    "raw_imgs/",
+    labels = None,
+    color_mode = 'rgb',
+    batch_size = batch_size,
+    image_size = (image_size, image_size),
+    shuffle=False,
+    interpolation='bilinear',
+    seed = seed
+)
+cookiecut_raw_imgs = keras.utils.image_dataset_from_directory(
     "cookiecut_raw_imgs/",
     labels = None,
     color_mode = 'rgb',
     batch_size = batch_size,
     image_size = (image_size, image_size),
-    shuffle=True,
+    shuffle=False,
     interpolation='bilinear',
     seed = seed
 )
 user_imgs = keras.utils.image_dataset_from_directory(
+    "user_imgs/",
+    labels = None,
+    color_mode = 'rgb',
+    batch_size = batch_size,
+    image_size = (image_size, image_size), # force everything to be this size?
+    shuffle=False,
+    interpolation='bilinear',
+    crop_to_aspect_ratio = True, # unsure about this one
+    seed = seed
+)
+cookiecut_user_imgs = keras.utils.image_dataset_from_directory(
     "cookiecut_user_imgs/",
     labels = None,
     color_mode = 'rgb',
     batch_size = batch_size,
     image_size = (image_size, image_size), # force everything to be this size?
-    shuffle=True,
+    shuffle=False,
     interpolation='bilinear',
     crop_to_aspect_ratio = True, # unsure about this one
     seed = seed
 )
+# and combine the cookiecut images with the cropped/zoomed ones:
+raw_imgs = raw_imgs.concatenate(cookiecut_raw_imgs)
+user_imgs = user_imgs.concatenate(cookiecut_user_imgs)
 
 style_image = tf.keras.preprocessing.image.load_img(
     'style_image.png',
@@ -353,9 +376,9 @@ cond_gan.fit(
     # data is already batched!
     epochs = epochs,
     verbose=1,
-    callbacks=[EveryKCallback(both_datasets, epoch_interval=2)], # custom callbacks here!
+    callbacks=[EveryKCallback(both_datasets, epoch_interval=1)], # custom callbacks here!
     # validation doesnt really apply here?
-    shuffle=False, # already shuffled by dataset api
+    shuffle=True,
 )
 
 cond_gan.save_weights("ckpts/finished", overwrite=True, save_format='h5')
