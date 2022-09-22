@@ -67,7 +67,7 @@ raw_imgs = keras.utils.image_dataset_from_directory(
     color_mode = 'rgb',
     batch_size = batch_size,
     image_size = (image_size, image_size),
-    shuffle=False,
+    shuffle=True,
     interpolation='bilinear',
     seed = seed
 )
@@ -77,7 +77,7 @@ cookiecut_raw_imgs = keras.utils.image_dataset_from_directory(
     color_mode = 'rgb',
     batch_size = batch_size,
     image_size = (image_size, image_size),
-    shuffle=False,
+    shuffle=True,
     interpolation='bilinear',
     seed = seed
 )
@@ -87,7 +87,7 @@ user_imgs = keras.utils.image_dataset_from_directory(
     color_mode = 'rgb',
     batch_size = batch_size,
     image_size = (image_size, image_size), # force everything to be this size?
-    shuffle=False,
+    shuffle=True,
     interpolation='bilinear',
     crop_to_aspect_ratio = True, # unsure about this one
     seed = seed
@@ -98,7 +98,7 @@ cookiecut_user_imgs = keras.utils.image_dataset_from_directory(
     color_mode = 'rgb',
     batch_size = batch_size,
     image_size = (image_size, image_size), # force everything to be this size?
-    shuffle=False,
+    shuffle=True,
     interpolation='bilinear',
     crop_to_aspect_ratio = True, # unsure about this one
     seed = seed
@@ -378,7 +378,7 @@ cond_gan.fit(
     verbose=1,
     callbacks=[EveryKCallback(both_datasets, epoch_interval=1)], # custom callbacks here!
     # validation doesnt really apply here?
-    shuffle=True,
+    shuffle=False,
 )
 
 cond_gan.save_weights("ckpts/finished", overwrite=True, save_format='h5')
