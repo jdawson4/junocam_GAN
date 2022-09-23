@@ -3,11 +3,11 @@
 # I need to understand in order to get the rest of the system
 # to work. You can safely ignore all of this.
 
-import numpy as np
-import tensorflow as tf
-from tensorflow import keras
-from constants import *
-import imageio
+#import numpy as np
+#import tensorflow as tf
+#from tensorflow import keras
+#from constants import *
+#import imageio
 
 '''def hasNan(x, number):
     if tf.math.reduce_any((tf.math.is_nan(x))):
@@ -60,4 +60,4 @@ for i in range(10):
     raw_images = list(random_selection.as_numpy_iterator())[0]
     raw_image = tf.convert_to_tensor(raw_images[0],dtype=tf.float32)
     raw_image = raw_image.numpy().astype(np.uint8)
-    imageio.imwrite('checkpoint_imgs/'+str(i)+'.png', raw_image)''''''
+    imageio.imwrite('checkpoint_imgs/'+str(i)+'.png', raw_image)'''
