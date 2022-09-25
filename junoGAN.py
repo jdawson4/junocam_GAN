@@ -157,7 +157,7 @@ def content_loss(fake, real):
     r=tf.cast(real, tf.float32)
     ssim = chi * (1.0-tf.experimental.numpy.mean(tf.image.ssim(f,r,1.0)))
     l1 = ((1.0-chi) * tf.norm((f/(batch_size*255.0)) - (r/(batch_size*255.0))))
-    return tf.cast(ssim,tf.float32)+tf.cast(l1,tf.float32)
+    return tf.cast(ssim,tf.float16)+tf.cast(l1,tf.float16)
 
 def gram_matrix(x):
     #x = tf.expand_dims(x, 0)
@@ -199,6 +199,7 @@ class ConditionalGAN(keras.Model):
         self.g_loss_fn = g_loss_fn
         #self.epoch_num = 0
 
+    @tf.function
     def train_step(self, data):
         #self.epoch_num+=1
         # alright, here's the thing I've been dreading.
@@ -212,11 +213,32 @@ class ConditionalGAN(keras.Model):
 
         # generate labels for the real and fake images
         batch_size = tf.shape(raw_img_batch)[0]
-        true_image_labels = -tf.cast(tf.ones((batch_size,1)), tf.float32)
-        fake_image_labels = tf.cast(tf.ones((batch_size,1)), tf.float32)
+        true_image_labels = -tf.cast(tf.ones((batch_size,1)), tf.float16)
+        fake_image_labels = tf.cast(tf.ones((batch_size,1)), tf.float16)
         # REMEMBER: TRUE IMAGES ARE -1, GENERATED IMAGES ARE +1
 
-        fake_images = self.generator(raw_img_batch, training=True)
+        with tf.GradientTape() as gtape, tf.GradientTape() as dtape:
+            gen_output = generator(raw_img_batch, training=True)
+            disc_real_output = discriminator(user_img_batch, training=True)
+            disc_generated_output = discriminator(gen_output, training=True)
+            wganLoss = -self.g_loss_fn(fake_image_labels,disc_generated_output)
+            wganLoss = tf.convert_to_tensor(wgan_lambda, dtype=tf.float16) * wganLoss
+            contentLoss = content_loss(gen_output, raw_img_batch)
+            contentLoss = tf.convert_to_tensor(content_lambda, dtype=tf.float16) * contentLoss
+            total_g_loss = wganLoss + contentLoss
+            d_loss = self.d_loss_fn(fake_image_labels,disc_generated_output) - self.d_loss_fn(true_image_labels,disc_real_output)
+        grads = gtape.gradient(total_g_loss, self.generator.trainable_weights)
+        self.g_optimizer.apply_gradients(
+            zip(grads,self.generator.trainable_weights)
+        )
+        self.gen_loss_tracker.update_state(total_g_loss)
+
+        grads = dtape.gradient(d_loss, self.discriminator.trainable_weights)
+        self.d_optimizer.apply_gradients(
+            zip(grads, self.discriminator.trainable_weights)
+        )
+        self.dis_loss_tracker.update_state(d_loss)
+        '''fake_images = self.generator(raw_img_batch, training=True)
         fake_images = tf.cast(fake_images,tf.float16)
         for itr in range(n_critic):
             with tf.GradientTape() as dtape:
@@ -252,7 +274,7 @@ class ConditionalGAN(keras.Model):
         self.g_optimizer.apply_gradients(
             zip(grads,self.generator.trainable_weights)
         )
-        self.gen_loss_tracker.update_state(total_g_loss)
+        self.gen_loss_tracker.update_state(total_g_loss)'''
 
         '''
         print("\nmaxes:")
@@ -270,8 +292,7 @@ class ConditionalGAN(keras.Model):
             'g_loss': self.gen_loss_tracker.result(),
             'd_loss': self.dis_loss_tracker.result(),
             'GAN_loss': wganLoss,
-            'content_loss': contentLoss,
-            'style_loss': styleLoss
+            'content_loss': contentLoss
         }
 
 # okay... let's try to use this thing:
