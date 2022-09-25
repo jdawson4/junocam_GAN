@@ -5,11 +5,11 @@
 #
 # CONSTANTS
 seed = 3 # my lucky number!
-batch_size = 16 # unsure what my computer can handle haha
+batch_size = 32 # unsure what my computer can handle haha
 num_channels = 3 # rgb!
 image_size = 400 # each raw image is 1600x1600. I think each output should be too, but testing may be faster on lower res
 epochs = 100
-n_critic = 1 # the number of times we'll train the discriminator before going on to the generator
+n_critic = 3 # the number of times we'll train the discriminator before going on to the generator
 # ^ the original paper chose 5
 
 # custom hyperparameters--determine things about loss:

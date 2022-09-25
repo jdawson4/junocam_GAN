@@ -9,7 +9,7 @@ from tensorflow import keras
 import tensorflow as tf
 from constants import *
 initializer = keras.initializers.RandomNormal(seed=seed)
-#initializer = keras.initializers.Ones()
+#initializer = keras.initializers.Zeros()
 class ClipConstraint(keras.constraints.Constraint):
 	# set clip value when initialized
 	def __init__(self, clip_value):
@@ -24,77 +24,62 @@ class ClipConstraint(keras.constraints.Constraint):
 		return {'clip_value': self.clip_value}
 const = ClipConstraint(0.01)
 
-# ok, the generator clearly isn't doing too hot.
-# Here we go with a new architecture: a densenet generator!
+def downsample(input, filters, size, apply_batchnorm=True):
+    out = keras.layers.Conv2D(filters, kernel_size=size, strides=2, padding='same', kernel_initializer=initializer)(input)
+    if apply_batchnorm:
+        out = keras.layers.BatchNormalization()(out)
+    out = keras.layers.Activation('selu')(out)
+    return out
 
-# first component: the Batchnormalize, Activation,
-# Convolution combo-punch
-def bac(x,filters):
-    b = keras.layers.BatchNormalization(momentum=0.85)(x)
-    b = keras.layers.Activation('selu')(b)
-    b = keras.layers.Conv2D(filters, kernel_size=(3,3), padding='same', kernel_initializer=initializer)(b)
-    return b
+def upsample(input, filters, size, apply_dropout=False):
+    out = keras.layers.Conv2DTranspose(filters, kernel_size=size, strides=2, padding='same', kernel_initializer=initializer)(input)
+    out = keras.layers.BatchNormalization()(out)
+    if apply_dropout:
+        out = keras.layers.Dropout(0.5)(out)
+    out = keras.layers.Activation('selu')(out)
+    return out
 
-# the DenseBlock then uses that above combination to create a
-# very dense thingie that outputs a good bit of data.
-def denseBlock(x,filters):
-    l1 = bac(x,filters)
-    l2 = bac(l1,filters)
-    l3 = bac(keras.layers.Concatenate()([l1,l2]),filters)
-    l4 = bac(keras.layers.Concatenate()([l1,l2,l3]),filters)
-    l5 = bac(keras.layers.Concatenate()([l1,l2,l3,l4]),filters)
-    # do we pool? I don't think so--that's only in the transition layers
-    return l5
-
-def transitionDownscale(x,filters):
-    conv = keras.layers.Conv2D(filters,kernel_size=(1,1),strides=(1,1),activation='selu',padding='same', kernel_initializer=initializer)(x)
-    avp = keras.layers.AveragePooling2D((2,2),strides=2)(conv)
-    return avp
-
-def transitionUpscale(x,filters):
-    conv = keras.layers.Conv2D(filters,kernel_size=(1,1),strides=(1,1),activation='selu',padding='same', kernel_initializer=initializer)(x)
-    ups = keras.layers.UpSampling2D(size=(2,2), interpolation='bilinear')(conv)
-    return ups
+def bottleneck(input, filters, size, apply_dropout=False, apply_batchnorm=True):
+    out = keras.layers.Conv2D(filters, kernel_size=size, strides=1, padding='same', kernel_initializer=initializer)(input)
+    if apply_batchnorm:
+        out = keras.layers.BatchNormalization()(out)
+    if apply_dropout:
+        out = keras.layers.Dropout(0.5)(out)
+    out = keras.layers.Activation('selu')(out)
+    return out
 
 def gen():
     input = keras.layers.Input(shape=(None,None,num_channels), dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/255.0, offset=0)(input)
-    #c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same', kernel_initializer=initializer)(scale)
-    c1 = keras.layers.Conv2D(4, kernel_size=(7,7), strides=(1,1), activation='selu', padding='same', kernel_initializer=initializer)(scale)
-    d1 = denseBlock(c1,8)
-    t1 = transitionDownscale(d1,8)
-    d2 = denseBlock(t1,16)
-    t2 = transitionDownscale(d2,16)
-    d3 = denseBlock(t2,32)
-    t3 = transitionDownscale(d3,32)
-    d4 = denseBlock(t3,64)
-    t4 = transitionUpscale(d4,32)
-    t4 = keras.layers.Concatenate()([t4,d3])
-    d5 = denseBlock(t4,16)
-    t5 = transitionUpscale(d5,16)
-    t5 = keras.layers.Concatenate()([t5, d2])
-    d6 = denseBlock(t5,8)
-    t6 = transitionUpscale(d6,8)
-    t6 = keras.layers.Concatenate()([t6,d1])
-    # these next three layers seem very important. Activation should have range in positive and negative numbers (we want to be able to subtract colors from the final image.)
-    # their output gets ADDED to the initial image; in other words, the output of the neural layers just decides how much color to add/remove from the original photo,
-    # how much to "correct" it by
-    c2 = keras.layers.Conv2D(num_channels, kernel_size=(3,3), strides=(1,1), activation='tanh',padding='same', kernel_initializer=initializer)(t6)
-    c3 = keras.layers.Conv2D(num_channels, kernel_size=(5,5), strides=(1,1), activation='tanh',padding='same', kernel_initializer=initializer)(c2)
-    out = keras.layers.Conv2D(num_channels, kernel_size=(1,1), strides=(1,1), activation='tanh',padding='same', kernel_initializer=initializer)(c3)
-    out = keras.layers.Add()([out, scale])
+    d1 = downsample(scale, 8, 4, apply_batchnorm=False)#200
+    d2 = downsample(d1, 16, 4)#100
+    d3 = downsample(d2, 32, 4)#50
+    d4 = downsample(d3, 64, 4)#25
+    d5 = bottleneck(d4, 64, 4)#25
+    d6 = bottleneck(d5, 64, 4)#25
+    d7 = bottleneck(d6, 64, 4)#25
+    d8 = bottleneck(d7, 64, 4)#25
+    u1 = bottleneck(d8, 64, 4, apply_dropout=True)#25
+    u1 = keras.layers.Concatenate()([u1,d7])
+    u2 = bottleneck(u1, 64, 4, apply_dropout=True)#25
+    u2 = keras.layers.Concatenate()([u2,d6])
+    u3 = bottleneck(u2, 64, 4, apply_dropout=True)#25
+    u3 = keras.layers.Concatenate()([u3,d5])
+    u4 = bottleneck(u3, 64, 4)#25
+    u4 = keras.layers.Concatenate()([u4,d4])
+    u5 = upsample(u4, 32, 4)#50
+    u5 = keras.layers.Concatenate()([u5,d3])
+    u6 = upsample(u5, 16, 4)#100
+    u6 = keras.layers.Concatenate()([u6,d2])
+    u7 = upsample(u6, 8, 4)#200
+    u7 = keras.layers.Concatenate()([u7,d1])
+    out = keras.layers.Conv2DTranspose(4,kernel_size=4,strides=2,padding='same',kernel_initializer=initializer,activation='tanh')(u7)#400
+    out = keras.layers.Conv2D(4,kernel_size=5,strides=1,padding='same',kernel_initializer=initializer,activation='tanh')(out)
+    out = keras.layers.Conv2D(num_channels,kernel_size=1,strides=1,padding='same',kernel_initializer=initializer,activation='tanh')(out)
+    out =  keras.layers.Add()([out, scale])
     out = keras.layers.Rescaling(255.0)(out)
     out = keras.layers.Lambda(lambda x: tf.clip_by_value(x, 0.0, 255.0))(out)
     return keras.Model(inputs=input, outputs=out, name='generator')
-
-def hasNan(x, number):
-    # I'm sick of getting this error. What if our network warns us when there's
-    # a Nan somewhere in the system?
-    def p(num): print(num,'has a nan!')
-    def q(num): pass
-    tf.cond(pred=tf.math.reduce_any((tf.math.is_nan(x))), true_fn=lambda:p(number), false_fn=lambda:q(number))
-    #f(number)
-    return x
 
 def dis_block(filters,input,batchnorm=True):
     output = keras.layers.Conv2D(filters,(2,2),(2,2),padding='valid', kernel_constraint=const)(input)
@@ -113,52 +98,28 @@ def discConvBlock(filters,input):
     output = keras.layers.Activation('selu')(output)
     return output
 
-# maybe not going to be used after all!
-'''def dense_block(filters,input):
-    output = keras.layers.BatchNormalization(momentum=0.85)(input)
-    c1 = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const, activation='selu')(output)
-    c2 = keras.layers.BatchNormalization(momentum=0.85)(c1)
-    c2 = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const, activation='selu')(c2)
-    c3 = keras.layers.Concatenate()([c1, c2])
-    c3 = keras.layers.BatchNormalization(momentum=0.85)(c3)
-    c3 = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const, activation='selu')(c3)
-    c4 = keras.layers.Concatenate()([c1, c2, c3])
-    c4 = keras.layers.BatchNormalization(momentum=0.85)(c4)
-    c4 = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const, activation='selu')(c4)
-    c5 = keras.layers.Concatenate()([c1, c2, c3, c4])
-    c5 = keras.layers.BatchNormalization(momentum=0.85)(c5)
-    c5 = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const, activation='selu')(c5)
-    output = keras.layers.Concatenate()([c1, c2, c3, c4, c5])
-    return output
-
-def transitionLayer(filters, input):
-    output = keras.layers.BatchNormalization(momentum=0.85)(input)
-    output = keras.layers.Conv2D(filters,(1,1),(1,1),padding='same', kernel_constraint=const, activation='selu')(output)
-    output = keras.layers.AveragePooling2D(pool_size=4, strides=4)(output)
-    return output'''
+def disc_block(input, filters, size, apply_batchnorm=True):
+    out = keras.layers.Conv2D(filters, kernel_size=size, strides=2, padding='same', kernel_initializer=initializer, kernel_constraint=const)(input)
+    if apply_batchnorm:
+        out = keras.layers.BatchNormalization()(out)
+    out = keras.layers.Activation('selu')(out)
+    return out
 
 def dis():
     input = keras.layers.Input(shape=(None,None,num_channels), dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/127.5,offset=-1)(input)
-    out = keras.layers.RandomRotation((-0.3,0.3),seed=seed)(scale)
-    out = keras.layers.RandomZoom(0.5,0.5,seed=seed)(out)
-    out = keras.layers.RandomFlip(seed=seed)(out)
-    out = keras.layers.RandomTranslation(0.3,0.3,seed=seed)(out)
-    out = keras.layers.Dropout(0.2,seed=seed)(out)
-    out = dis_block(8,out,batchnorm=False)
-    out = keras.layers.Dropout(0.2,seed=seed)(out)
-    out = dis_block(8,out)
-    out = keras.layers.Dropout(0.2)(out)
-    out = dis_block(16,out)
-    #out = dis_block(16,out)
-    out = dis_block(32,out)
-    out = dis_block(64,out)
-    out = dis_block(128,out)
-    out = discConvBlock(128, out)
-    #out = discConvBlock(32, out)
-    #out = discConvBlock(32, out)
-    #out = discConvBlock(32, out)
-    #out = keras.layers.Flatten()(out)
+    out = disc_block(scale, 8, 4, apply_batchnorm=False)
+    out = disc_block(out, 16, 4)
+    out = disc_block(out, 32, 4)
+    out = keras.layers.Conv2D(
+        64,
+        kernel_size=4,
+        strides=1,
+        kernel_initializer=initializer,
+        kernel_constraint=const
+    )(out)
+    out = keras.layers.BatchNormalization()(out)
+    out = keras.layers.Activation('selu')(out)
     out = keras.layers.GlobalAveragePooling2D()(out)
     out = keras.layers.Dense(1, kernel_constraint=const)(out)
     return keras.Model(inputs=input,outputs=out,name='discriminator')
