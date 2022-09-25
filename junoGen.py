@@ -11,7 +11,7 @@ raw_imgs = tf.keras.preprocessing.image_dataset_from_directory(
     labels = None,
     color_mode = 'rgb',
     batch_size = 1,
-    image_size = (image_size, image_size),
+    image_size = (1600, 1600),
     shuffle=False, # same order as the directory so we can compare!
     seed = seed
 )

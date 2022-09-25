@@ -9,15 +9,12 @@ batch_size = 32 # unsure what my computer can handle haha
 num_channels = 3 # rgb!
 image_size = 400 # each raw image is 1600x1600. I think each output should be too, but testing may be faster on lower res
 epochs = 100
-n_critic = 3 # the number of times we'll train the discriminator before going on to the generator
-# ^ the original paper chose 5
 
 # custom hyperparameters--determine things about loss:
 chi = 0.9 # how much we care about SSIM vs L2 when creating content loss
 # ^ not sure if we're even going to use L2 after all.
 content_lambda = 0.001 # content loss weight
 wgan_lambda = 1.0 # the weight we give to fooling the wgan
-style_lambda = 0.0 # the weight we give to style loss
 
 # learning rates: a few different strategies:
 # 1.
