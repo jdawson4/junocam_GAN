@@ -32,6 +32,8 @@ def downsample(input, filters, size, apply_batchnorm=True):
     return out
 
 def upsample(input, filters, size, apply_dropout=False):
+    #out = keras.layers.UpSampling2D(size=(2,2), interpolation='bilinear')(input) # removes "grid" artifacting, but produces NaNs on train :(
+    #out = keras.layers.Conv2DTranspose(filters, kernel_size=size, strides=1, padding='same', kernel_initializer=initializer)(out)
     out = keras.layers.Conv2DTranspose(filters, kernel_size=size, strides=2, padding='same', kernel_initializer=initializer)(input)
     out = keras.layers.BatchNormalization()(out)
     if apply_dropout:
@@ -51,52 +53,34 @@ def bottleneck(input, filters, size, apply_dropout=False, apply_batchnorm=True):
 def gen():
     input = keras.layers.Input(shape=(None,None,num_channels), dtype=tf.float16)
     scale = keras.layers.Rescaling(1.0/255.0, offset=0)(input)
-    d1 = downsample(scale, 8, 4, apply_batchnorm=False)#200
-    d2 = downsample(d1, 16, 4)#100
-    d3 = downsample(d2, 32, 4)#50
-    d4 = downsample(d3, 64, 4)#25
-    d5 = bottleneck(d4, 64, 4)#25
-    d6 = bottleneck(d5, 64, 4)#25
-    d7 = bottleneck(d6, 64, 4)#25
-    d8 = bottleneck(d7, 64, 4)#25
-    u1 = bottleneck(d8, 64, 4, apply_dropout=True)#25
+    d1 = downsample(scale, 4, 2, apply_batchnorm=False)#200
+    d2 = downsample(d1, 8, 2)#100
+    d3 = downsample(d2, 16, 2)#50
+    d4 = downsample(d3, 32, 2)#25
+    d5 = bottleneck(d4, 32, 3)#25
+    d6 = bottleneck(d5, 32, 3)#25
+    d7 = bottleneck(d6, 32, 3)#25
+    d8 = bottleneck(d7, 32, 5)#25
+    u1 = bottleneck(d8, 32, 5, apply_dropout=True)#25
     u1 = keras.layers.Concatenate()([u1,d7])
-    u2 = bottleneck(u1, 64, 4, apply_dropout=True)#25
+    u2 = bottleneck(u1, 32, 3, apply_dropout=True)#25
     u2 = keras.layers.Concatenate()([u2,d6])
-    u3 = bottleneck(u2, 64, 4, apply_dropout=True)#25
+    u3 = bottleneck(u2, 32, 3, apply_dropout=True)#25
     u3 = keras.layers.Concatenate()([u3,d5])
-    u4 = bottleneck(u3, 64, 4)#25
+    u4 = bottleneck(u3, 32, 3)#25
     u4 = keras.layers.Concatenate()([u4,d4])
-    u5 = upsample(u4, 32, 4)#50
+    u5 = upsample(u4, 16, 2)#50
     u5 = keras.layers.Concatenate()([u5,d3])
-    u6 = upsample(u5, 16, 4)#100
+    u6 = upsample(u5, 8, 2)#100
     u6 = keras.layers.Concatenate()([u6,d2])
-    u7 = upsample(u6, 8, 4)#200
+    u7 = upsample(u6, 4, 2)#200
     u7 = keras.layers.Concatenate()([u7,d1])
-    out = keras.layers.Conv2DTranspose(4,kernel_size=4,strides=2,padding='same',kernel_initializer=initializer,activation='tanh')(u7)#400
-    out = keras.layers.Conv2D(4,kernel_size=5,strides=1,padding='same',kernel_initializer=initializer,activation='tanh')(out)
+    out = keras.layers.Conv2DTranspose(4,kernel_size=2,strides=2,padding='same',kernel_initializer=initializer,activation='tanh')(u7)#400
     out = keras.layers.Conv2D(num_channels,kernel_size=1,strides=1,padding='same',kernel_initializer=initializer,activation='tanh')(out)
     out =  keras.layers.Add()([out, scale])
     out = keras.layers.Rescaling(255.0)(out)
     out = keras.layers.Lambda(lambda x: tf.clip_by_value(x, 0.0, 255.0))(out)
     return keras.Model(inputs=input, outputs=out, name='generator')
-
-def dis_block(filters,input,batchnorm=True):
-    output = keras.layers.Conv2D(filters,(2,2),(2,2),padding='valid', kernel_constraint=const)(input)
-    if batchnorm:
-        output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.Activation('selu')(output)
-    return output
-
-# this describes internal convolutions for the discriminator
-def discConvBlock(filters,input):
-    output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const)(input) # 3x3 because these are in a small latent space.
-    output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.Activation('selu')(output)
-    output = keras.layers.Conv2D(filters,(3,3),(1,1),padding='same', kernel_constraint=const)(output)
-    output = keras.layers.BatchNormalization(momentum=0.85)(output)
-    output = keras.layers.Activation('selu')(output)
-    return output
 
 def disc_block(input, filters, size, apply_batchnorm=True):
     out = keras.layers.Conv2D(filters, kernel_size=size, strides=2, padding='same', kernel_initializer=initializer, kernel_constraint=const)(input)
