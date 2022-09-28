@@ -32,9 +32,9 @@ def downsample(input, filters, size, stride=2, apply_batchnorm=True):
     return out
 
 def upsample(input, filters, size, stride=2, apply_dropout=False):
-    #out = keras.layers.UpSampling2D(size=(2,2), interpolation='nearest')(input) # removes "grid" artifacting, but produces NaNs on train :(
-    #out = keras.layers.Conv2DTranspose(filters, kernel_size=size, strides=1, padding='same', kernel_initializer=initializer)(out)
-    out = keras.layers.Conv2DTranspose(filters, kernel_size=size, strides=stride, padding='same', kernel_initializer=initializer)(input)
+    out = keras.layers.UpSampling2D(size=(2,2), interpolation='nearest')(input) # removes "grid" artifacting, but produces NaNs on train :(
+    out = keras.layers.Conv2DTranspose(filters, kernel_size=size, strides=1, padding='same', kernel_initializer=initializer)(out)
+    #out = keras.layers.Conv2DTranspose(filters, kernel_size=size, strides=stride, padding='same', kernel_initializer=initializer)(input)
     out = keras.layers.BatchNormalization()(out)
     if apply_dropout:
         out = keras.layers.Dropout(0.5)(out)
@@ -75,7 +75,8 @@ def gen():
     u6 = keras.layers.Concatenate()([u6,d2])
     u7 = upsample(u6, 8, 2)#200
     u7 = keras.layers.Concatenate()([u7,d1])
-    out = keras.layers.Conv2DTranspose(8,kernel_size=2,strides=2,padding='same',kernel_initializer=initializer,activation='tanh')(u7)#400
+    out = upsample(u7, 8, 2)#400
+    out = keras.layers.Conv2D(8,kernel_size=5,strides=1,padding='same',kernel_initializer=initializer,activation='tanh')(out)
     out = keras.layers.Conv2D(num_channels,kernel_size=1,strides=1,padding='same',kernel_initializer=initializer,activation='tanh')(out)
     out =  keras.layers.Add()([out, scale])
     out = keras.layers.Rescaling(255.0)(out)
@@ -97,8 +98,9 @@ def dis():
     out = disc_block(out, 16, 2, 2)
     out = disc_block(out, 32, 2, 2)
     out = disc_block(out, 64, 2, 2)
+    out = disc_block(out, 128, 2, 2)
     out = keras.layers.Conv2D(
-        64,
+        128,
         kernel_size=3,
         strides=1,
         kernel_initializer=initializer,

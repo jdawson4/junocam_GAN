@@ -163,7 +163,6 @@ class ConditionalGAN(keras.Model):
         self.g_loss_fn = g_loss_fn
         #self.epoch_num = 0
 
-    @tf.function
     def train_step(self, data):
         raw_img_batch, user_img_batch = data
 
