@@ -220,7 +220,7 @@ cond_gan.compile(
 
 # only uncomment this code if you have a prepared checkpoint to use for output:
 #cond_gan.built=True
-#cond_gan.load_weights("ckpts/ckpt35")
+#cond_gan.load_weights("ckpts/ckpt60")
 #print("Checkpoint loaded, skipping training.")
 
 class EveryKCallback(keras.callbacks.Callback):
@@ -239,9 +239,7 @@ class EveryKCallback(keras.callbacks.Callback):
             imageio.imwrite('checkpoint_imgs/'+str(epoch)+'raw.png', raw_image)
 
             self.model.save_weights("ckpts/ckpt"+str(epoch), overwrite=True, save_format='h5')
-            if (epoch%(self.epoch_interval*2))==0:
-                self.model.generator.save('junoGen',overwrite=True)
-                # every few checkpoints, save model.
+            self.model.generator.save('junoGen',overwrite=True)
 
 both_datasets = tf.data.Dataset.zip((raw_imgs,user_imgs))
 cond_gan.fit(
