@@ -111,6 +111,9 @@ print("Checkpoint loaded.")
 trained_gen = cond_gan.generator
 print("Extracted generator.")
 
+# if you decide you wanna save the generator as-is:
+#trained_gen.save('junoGen',overwrite=True)
+
 i = 0
 for b in raw_imgs.__iter__():
     i+=1
