@@ -11,9 +11,9 @@ image_size = 400 # each raw image is 1600x1600. I think each output should be to
 epochs = 100
 
 # custom hyperparameters--determine things about loss:
-chi = 0.7 # how much we care about SSIM vs L1 when creating content loss
+chi = 0.75 # how much we care about SSIM vs L1 when creating content loss
 # ^ not sure if we're even going to use L2 after all.
-content_lambda = 0.75 # content loss weight
+content_lambda = 0.625 # content loss weight
 wgan_lambda = 1.0 # the weight we give to fooling the wgan
 
 # learning rates: a few different strategies:

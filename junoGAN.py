@@ -247,7 +247,7 @@ cond_gan.fit(
     # data is already batched!
     epochs = epochs,
     verbose=1,
-    callbacks=[EveryKCallback(both_datasets, epoch_interval=4)], # custom callbacks here!
+    callbacks=[EveryKCallback(both_datasets, epoch_interval=3)], # custom callbacks here!
     # validation doesnt really apply here?
     shuffle=False, # shuffling done via dataset api
 )
