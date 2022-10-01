@@ -4,6 +4,9 @@ Purpose: the idea here is to implement a GAN and train it to automatically proce
 
 This project is currently a work-in-progress and it breaks frequently, because GANs are sorta hard to train and I'm just a beginner. Hopefully we can produce some pretty images soon though!
 
+Here's an example of what we're trying to achieve. This photo shows the "before-and-after" of what the generative model does. On the left, we see the raw image, as taken by the JunoCAM itself. On the left, the image has been processed by one of my trained models. The difference is (in my opinion) remarkable--the model has learned aesthetics!
+<img src="comparison.png" alt="Before-and-after" title="Before-and-after">
+
 Here's some visualizations of the models:
 <img src="generator_plot.png" alt="The generator's architecture" title="The generator's architecture">
 <img src="discriminator_plot.png" alt="The discriminator's architecture" title="The discriminator's architecture">
