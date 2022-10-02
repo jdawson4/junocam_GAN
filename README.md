@@ -36,5 +36,6 @@ Files:
 13. test.py is just some junk code that I used to test certain tensorflow/numpy files
 
 Here's some visualizations of the models:
+
 <img src="generator_plot.png" alt="The generator's architecture" title="The generator's architecture" style="width:200px;">
 <img src="discriminator_plot.png" alt="The discriminator's architecture" title="The discriminator's architecture" style="width:200px;">
