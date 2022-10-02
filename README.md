@@ -1,9 +1,11 @@
 # junocam_GAN
-<img src="favorite_output.png" alt="My favorite output so far" title="My favorite output so far" style="width:200px;">
+<img src="favorite_output.png" alt="My favorite output so far" title="My favorite output so far" style="width:400px;">
+
 Purpose: the idea here is to implement a GAN and train it to automatically process images of space. There's lots of unprocessed space data out there, and I've always wanted to make a data-driven solution to automating the processing of it. One can access raw images taken by spacecraft, for instance from the JunoCam project, found here: https://www.missionjuno.swri.edu/junocam/processing/
 
 Here's an example of what we're trying to achieve. This photo shows the "before-and-after" of what the generative model does. On the left, we see the raw image, as taken by the JunoCAM itself. On the left, the image has been processed by one of my trained models. The difference is (in my opinion) remarkable--the model has learned aesthetics!
-<img src="comparison.PNG" alt="Before-and-after" title="Before-and-after" style="width:200px;">
+
+<img src="comparison.PNG" alt="Before-and-after" title="Before-and-after" style="width:800px;">
 
 I feel that this project has now reached its logical end goal--high-resolution, enhanced-contrast, aesthetically pleasing images of Jupiter. I will note, however, that the engineering problem of training a GAN is not entirely complete, because the GAN still seems unstable. My favorite version of the generator (included in this repo) comes from epoch 66 out of 100--beyond this point, training destabilized again! So, the end goal of completing hundreds of epochs of training and reliably coming up with a good generator is still open to discussion, likely by iterating on the hyperparameters found in constants.py.
 
