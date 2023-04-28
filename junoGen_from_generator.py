@@ -7,7 +7,7 @@ import imageio
 from constants import *
 
 raw_imgs = tf.keras.preprocessing.image_dataset_from_directory(
-    "raw_imgs/",
+    "cherry_picked_raw/",
     labels = None,
     color_mode = 'rgb',
     batch_size = 1,
@@ -27,5 +27,5 @@ for b in raw_imgs.__iter__():
     for fake_image in fake_images:
         # sorta weird to loop like this but keras outputs a list of length 1,
         # so just go with it
-        imageio.imwrite('fake_images/'+str(i)+'.png', fake_image)
+        imageio.imwrite('cherry_picked_fake/'+str(i)+'.png', fake_image)
         

@@ -5,6 +5,8 @@ user_imgs/
 fake_images/
 cookiecut_raw_imgs/
 cookiecut_user_imgs/
+cherry_picked_raw/
+cherry_picked_fake/
 ckpts/
 
 # we do not need pycache:
